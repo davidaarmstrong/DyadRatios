@@ -1,0 +1,640 @@
+class(p)
+update(p)
+p <- intQualQuant(mod2, c("income", "type"), type="facs", plot=TRUE)
+p
+intQualQuant <- function(obj, vars, level = .95 , varcov=NULL,#
+	labs = NULL, n = 10 , onlySig = FALSE, type = c("facs", "slopes"),#
+	plot=TRUE, vals = NULL, rug=TRUE, ci=TRUE, digits=3,...){#
+type=match.arg(type)#
+cl <- attr(terms(obj), "dataClasses")[vars]#
+if(length(cl) != 2){#
+	stop("vars must identify 2 and only 2 model terms")#
+}#
+if(!all(c("numeric", "factor") %in% cl)){#
+	stop("vars must have one numeric and one factor")#
+}#
+facvar <- names(cl)[which(cl == "factor")]#
+quantvar <- names(cl)[which(cl == "numeric")]#
+faclevs <- obj$xlevels[[facvar]]#
+if(is.null(labs)){#
+	labs <- faclevs#
+}#
+if(!is.null(vals)){n <- length(vals)}#
+if(!is.null(vals)){#
+	quantseq <- vals#
+}#
+else{#
+	qrange <- range(obj$model[[quantvar]], na.rm=TRUE)#
+	quantseq <- seq(qrange[1], qrange[2], length=n)#
+}#
+b <- coef(obj)#
+if(is.null(varcov)){#
+    varcov <- vcov(obj)#
+}#
+faccoef <- paste(facvar, faclevs, sep="")#
+main.ind <- sapply(faccoef, function(x)#
+	grep(paste("^", x, "$", sep=""), names(b)))#
+main.ind <- sapply(main.ind, function(x)#
+	ifelse(length(x) == 0, 0, x))#
+int.ind1 <- sapply(faccoef, function(x){#
+	g1 <- grep(paste("[a-zA-Z0-9]*\\:", x, "$", sep=""),#
+		names(b))#
+	ifelse(length(g1) == 0, 0, g1)#
+})#
+int.ind2 <- sapply(faccoef, function(x){#
+	g2 <- grep(paste("^", x, "\\:[a-zA-Z0-9]*", sep=""),#
+		names(b))#
+	ifelse(length(g2) == 0, 0, g2)#
+})#
+{if(sum(int.ind1) != 0){int.ind <- int.ind1}#
+else{int.ind <- int.ind2}}#
+#
+inds <- cbind(main.ind, int.ind)#
+nc <- ncol(inds)#
+dn <- dimnames(inds)#
+if(!("matrix" %in% class(inds))){inds <- matrix(inds, nrow=1)}#
+outind <- which(main.ind == 0)#
+inds <- inds[-outind, ]#
+if(length(inds) == nc){#
+	inds <- matrix(inds, ncol=nc)#
+}#
+rownames(inds) <- dn[[1]][-outind]#
+colnames(inds) <- dn[[2]]#
+#
+if(length(faclevs) < 2){stop("Factor must have at least two unique values")}#
+{if(length(faclevs) > 2){#
+combs <- combn(length(faclevs)-1, 2)#
+}#
+else{#
+	combs <- matrix(1:length(faclevs), ncol=1)#
+}}#
+mf <- model.frame(obj)#
+c2 <- combn(1:length(faclevs), 2)#
+dc <- dim(c2)#
+fl2 <- matrix(faclevs[c2], nrow=dc[1], ncol=dc[2])#
+l <- list()#
+for(i in 1:ncol(c2)){#
+	l[[i]] <- list()#
+	l[[i]][[fl2[[1,i]]]] <- mf[which(mf[[facvar]] == fl2[1,i]), quantvar]#
+	l[[i]][[fl2[[2,i]]]] <- mf[which(mf[[facvar]] == fl2[2,i]), quantvar]#
+}#
+#
+tmp.A <- matrix(0, nrow=length(quantseq), ncol=length(b))#
+A.list <- list()#
+k <- 1#
+for(i in 1:nrow(inds)){#
+	A.list[[k]] <- tmp.A#
+	A.list[[k]][,inds[i,1]] <- 1#
+	A.list[[k]][,inds[i,2]] <- quantseq#
+	k <- k+1#
+}#
+if(nrow(inds) > 1){#
+for(i in 1:ncol(combs)){#
+	A.list[[k]] <- tmp.A#
+	A.list[[k]][,inds[combs[1,i], 1]] <- -1#
+	A.list[[k]][,inds[combs[2,i], 1]] <- 1#
+	A.list[[k]][,inds[combs[1,i], 2]] <- -quantseq#
+	A.list[[k]][,inds[combs[2,i], 2]] <- quantseq#
+	k <- k+1#
+}#
+}#
+#
+effs <- lapply(A.list, function(x)x%*%b)#
+se.effs <- lapply(A.list, function(x)sqrt(diag(x %*% varcov %*%t(x))))#
+allcombs <- combn(length(faclevs), 2)#
+list.labs <- apply(rbind(labs[allcombs[2,]],#
+	labs[allcombs[1,]]), 2,#
+	function(x)paste(x, collapse=" - "))#
+#
+names(A.list) <- list.labs#
+dat <- data.frame(#
+	fit = do.call("c", effs),#
+	se.fit = do.call("c", se.effs),#
+	x = rep(quantseq, length(A.list)),#
+	contrast = rep(names(A.list), each=n)#
+	)#
+level <- level + ((1-level)/2)#
+dat$lower <- dat$fit - qt(level,#
+	obj$df.residual)*dat$se.fit#
+dat$upper <- dat$fit + qt(level,#
+	obj$df.residual)*dat$se.fit#
+res <- dat#
+for(i in c(1,2,3,5,6)){#
+    res[,i] <- round(res[,i], digits)#
+}#
+if(onlySig){#
+	sigs <- do.call(rbind,#
+		by(dat[,c("lower", "upper")],#
+		list(dat$contrast), function(x)#
+		c(max(x[,1]), min(x[,2]))))#
+	notsig <- which(sigs[,1] < 0 & sigs[,2] > 0)#
+    res <- res[-which(dat$contrast %in% names(notsig)), ]#
+}#
+#
+if(type == "facs"){#
+	if(!plot){#
+        return(res)#
+	}#
+	if(plot){#
+		rl <- range(c(res[, c("lower", "upper")]))#
+		if(rug)rl[1] <- rl[1] - (.05*length(faclevs))*diff(rl)#
+		p <- xyplot(fit ~ x | contrast, data=res, xlab = quantvar, ylab = "Predicted Difference", ylim = rl,#
+			lower=res$lower, upper=res$upper,#
+			prepanel = prepanel.ci, zl=TRUE,#
+		panel=function(x,y,subscripts,lower,upper,zl){#
+			panel.lines(x,y,col="black")#
+			if(ci){#
+				panel.lines(x,lower[subscripts], col="black", lty=2)#
+				panel.lines(x,upper[subscripts], col="black", lty=2)#
+			}#
+			if(zl)panel.abline(h=0, lty=3, col="gray50")#
+			if(rug){#
+				panel.doublerug(xa=l[[packet.number()]][[1]],xb=l[[packet.number()]][[2]])#
+		}#
+}#
+)#
+#	plot(p)#
+	return(p)#
+}#
+}#
+if(type == "slopes"){#
+	if(!plot){#
+	gq1 <- grep(paste(".*\\:", quantvar, "$", sep=""), names(b))#
+	gq2 <- grep(paste("^", quantvar, ".*\\:", sep=""), names(b))#
+	{if(length(gq1) == 0){qint <- gq2}#
+	else{qint <-  gq1}}#
+	if(length(qint) == 0){stop("Problem finding interaction coefficients")}#
+	qint <- c(grep(paste("^", quantvar, "$", sep=""), names(b)), qint)#
+	W <- matrix(0, nrow=length(faclevs), ncol=length(b))#
+	W[, qint[1]] <- 1#
+	W[cbind(1:length(faclevs), qint)] <- 1#
+#
+	V <- vcov(obj)#
+	qeff <- c(W %*% b)#
+	qvar <- W %*% V %*% t(W)#
+	qse <- c(sqrt(diag(qvar)))#
+	qtstats <- c(qeff/qse)#
+	qpv <- c(2*pt(abs(qtstats), obj$df.residual, lower.tail=F))#
+#
+	qres <- sapply(list(qeff, qse, qtstats, qpv), function(x)sprintf("%.3f", x))#
+	colnames(qres) <- c("B", "SE(B)", "t-stat", "Pr(>|t|)")#
+	rownames(qres) <- faclevs#
+	names(qeff) <- faclevs#
+	cat("Conditional effects of ", quantvar, ":\n")#
+	print(noquote((qres)))#
+	res <- list(out = data.frame(eff = qeff, se = qse, tstat=qtstats, pvalue=qpv), varcor = qvar)#
+	invisible(res)#
+}#
+if(plot){#
+	intterm <- NULL#
+	if(paste(facvar, quantvar, sep=":") %in% colnames(attr(terms(obj), "factors"))){#
+		intterm <- paste(facvar, quantvar, sep="*")#
+	}#
+	if(paste(quantvar, facvar, sep=":") %in% colnames(attr(terms(obj), "factors"))){#
+		intterm <- paste(quantvar, facvar, sep="*")#
+	}#
+	if(is.null(intterm)){#
+		stop("No interaction in model\n")#
+	}#
+	e <- do.call(effect, c(list(term=intterm, mod=obj, default.levels=n, ...)))#
+	le <- as.list(by(mf[[quantvar]], list(mf[[facvar]]), function(x)x))#
+#
+	edf <- data.frame(fit = e$fit, x = e$x[,quantvar],#
+	   fac = e$x[,facvar], se = e$se)#
+	edf$lower <- edf$fit - qt(.975, obj$df.residual)*edf$se#
+	edf$upper <- edf$fit + qt(.975, obj$df.residual)*edf$se#
+#
+	yl <- range(c(edf$upper, edf$lower))#
+	xl <- range(edf$x) + c(-1,1)*.01*diff(range(edf$x))#
+	if(rug)yl[1] <- yl[1] - (.05*length(faclevs))*diff(yl)#
+#
+	p <- xyplot(fit ~ x, group = edf$fac, data=edf,#
+		lower=edf$lower, upper=edf$upper,#
+		ylim = yl, xlim=xl,#
+		xlab = quantvar, ylab="Predicted Values",#
+		key=simpleKey(faclevs, lines=TRUE, points=FALSE),#
+		panel = function(x,y,groups, lower, upper, ...){#
+		if(ci){#
+			panel.transci(x,y,groups,lower,upper, ...)#
+		}#
+		else{#
+			panel.superpose(x=x,y=y, ..., panel.groups="panel.xyplot", type="l", groups=groups)#
+		}#
+		if(rug){#
+			for(i in 1:length(faclevs)){#
+				st <- (0) + (i-1)*.03#
+				end <- st + .02#
+				panel.rug(x=le[[i]],y=NULL,col=trellis.par.get("superpose.line")$col[i], start=st, end=end)#
+#
+				}#
+			}#
+		})#
+	# plot(p)#
+	return(p)#
+}#
+}#
+}
+p <- intQualQuant(mod2, c("income", "type"), type="facs", plot=TRUE)
+po
+p
+class(p)
+library(bartMachine)
+quit('no')
+help(package=car)
+library(xgboost)
+?xgboost
+help(package=car)
+library(dplyr)
+help(package=dplyr)
+library(tibble)
+help(package=tibble)
+library(plyr)
+?join
+help(package=dplyr)
+?filter
+?sort
+library(polywog)
+polywog
+polywog:::fitPolywog
+library(polywog)
+polywog:::fitPolywog
+getAnywhere(fitPolywog)
+getAnywhere("fitPolywog")
+library(glmnet)
+?glmnet
+install.packages("Rmpi")
+install.packages("doMPI")
+simfun <- function(m, nSim=10000){#
+require(MASS)#
+require(bartMachine)#
+require(earth)#
+require(xgboost)#
+require(tibble)#
+source("~/mldiag/r/diagfun.r")#
+subnames <- function(x){#
+    x <- gsub("*", ".", x, fixed=T)#
+    x <- gsub("^", "_", x, fixed=T)#
+    x <- gsub("\\-\\-", "-", x)#
+    x <- gsub("\\(\\d*\\.\\d*\\-", "(", x)#
+    x <- gsub("\\(\\-\\d*\\.\\d*\\-", "(", x)#
+    x <- gsub("\\-\\d*\\.\\d*\\)", ")", x)#
+    x <- gsub("h\\(([a-zA-Z0-9\\_\\.]+)\\)", "h_\\1", x)#
+    x#
+}#
+scales <- c(.25,.5,1, 1.5, 2)#
+n <- c(500, 1000, 2500)#
+eg <- expand.grid(scale = scales, n=n)#
+#
+coefs <- list()#
+for(i in 1:6){#
+    coefs[[i]] <- tibble(obs = 0)#
+}#
+for(j in 1:nSim){#
+n <- eg[m, 2]#
+k <- 8#
+x <- matrix(runif(n*k, -2,2), ncol=k)#
+b <- runif(5, .5, 2)#
+scale <- eg[m,1]#
+yh1 <- b[1]*x[,1] + b[2]*x[,2] + b[3]*x[,1]*x[,2] #
+yh2 <-  b[4]*x[,3] + b[5]*x[,4] #+ b[6]*x[,3]*x[,4]#
+b[4:5] <- b[4:5]*(sd(yh1)/sd(yh2)) * (1/scale)#
+yh2 <-  b[4]*x[,3] + b[5]*x[,4] #+ b[6]*x[,3]*x[,4]#
+yhat <- yh1 + yh2#
+y <- yhat + rnorm(n, 0, 1*sd(yhat))#
+colnames(x) <- paste0("x", 1:k)#
+#
+df <- cbind(as.data.frame(y), as.data.frame(x))#
+add.mod <- lm(y ~ x1 + x2 + x3 + x4 + x5 + x6 + x7 + x8, data=df)#
+#
+out <- diagFun(add.mod, data=df, shrinkEngine="xgboost", partialFirst = "none", cors="test")#
+rn <- lapply(out$coefs, rownames)#
+rn <- lapply(rn, subnames)#
+l <- lapply(rn, function(x){tmp <- as.list(rep(1, length(unique(x)))); names(tmp) <- unique(x); tmp})#
+clist <- lapply(l, function(x)do.call(tibble, x))#
+for(i in 1:length(clist)){#
+    clist[[i]] <- add_column(clist[[i]], obs = j)#
+    coefs[[i]] <- dplyr:::full_join(coefs[[i]], clist[[i]])#
+}#
+}#
+#
+for(i in 1:length(coefs)){#
+    coefs[[i]][which(is.na(coefs[[i]]), arr.ind=T)] <- 0#
+}#
+#
+coefs <- lapply(coefs, function(x)dplyr:::filter(x, obs!=0))#
+lapply(coefs, function(x)sort(colMeans(dplyr:::select(x, -1)), decreasing=TRUE))#
+}
+simfun(1, 10)
+library(doMPI)
+cl <- startMPIcluster(count=4)
+cl <- startMPIcluster(count=3)
+closeCluster(cl)
+startMPIcluster(count=2)
+cl
+library(doMPI)
+cl <- startMPIcluster(count=3)
+registerDoMPI(cl)
+simfun <- function(m, nSim=10000){#
+require(MASS)#
+require(bartMachine)#
+require(earth)#
+require(xgboost)#
+require(tibble)#
+source("~/mldiag/r/diagfun.r")#
+subnames <- function(x){#
+    x <- gsub("*", ".", x, fixed=T)#
+    x <- gsub("^", "_", x, fixed=T)#
+    x <- gsub("\\-\\-", "-", x)#
+    x <- gsub("\\(\\d*\\.\\d*\\-", "(", x)#
+    x <- gsub("\\(\\-\\d*\\.\\d*\\-", "(", x)#
+    x <- gsub("\\-\\d*\\.\\d*\\)", ")", x)#
+    x <- gsub("h\\(([a-zA-Z0-9\\_\\.]+)\\)", "h_\\1", x)#
+    x#
+}#
+scales <- c(.25,.5,1, 1.5, 2)#
+n <- c(500, 1000, 2500)#
+eg <- expand.grid(scale = scales, n=n)#
+#
+coefs <- list()#
+for(i in 1:6){#
+    coefs[[i]] <- tibble(obs = 0)#
+}#
+for(j in 1:nSim){#
+n <- eg[m, 2]#
+k <- 8#
+x <- matrix(runif(n*k, -2,2), ncol=k)#
+b <- runif(5, .5, 2)#
+scale <- eg[m,1]#
+yh1 <- b[1]*x[,1] + b[2]*x[,2] + b[3]*x[,1]*x[,2] #
+yh2 <-  b[4]*x[,3] + b[5]*x[,4] #+ b[6]*x[,3]*x[,4]#
+b[4:5] <- b[4:5]*(sd(yh1)/sd(yh2)) * (1/scale)#
+yh2 <-  b[4]*x[,3] + b[5]*x[,4] #+ b[6]*x[,3]*x[,4]#
+yhat <- yh1 + yh2#
+y <- yhat + rnorm(n, 0, 1*sd(yhat))#
+colnames(x) <- paste0("x", 1:k)#
+#
+df <- cbind(as.data.frame(y), as.data.frame(x))#
+add.mod <- lm(y ~ x1 + x2 + x3 + x4 + x5 + x6 + x7 + x8, data=df)#
+#
+out <- diagFun(add.mod, data=df, shrinkEngine="xgboost", partialFirst = "none", cors="test")#
+rn <- lapply(out$coefs, rownames)#
+rn <- lapply(rn, subnames)#
+l <- lapply(rn, function(x){tmp <- as.list(rep(1, length(unique(x)))); names(tmp) <- unique(x); tmp})#
+clist <- lapply(l, function(x)do.call(tibble, x))#
+for(i in 1:length(clist)){#
+    clist[[i]] <- add_column(clist[[i]], obs = j)#
+    coefs[[i]] <- dplyr:::full_join(coefs[[i]], clist[[i]])#
+}#
+}#
+#
+for(i in 1:length(coefs)){#
+    coefs[[i]][which(is.na(coefs[[i]]), arr.ind=T)] <- 0#
+}#
+#
+coefs <- lapply(coefs, function(x)dplyr:::filter(x, obs!=0))#
+lapply(coefs, function(x)sort(colMeans(dplyr:::select(x, -1)), decreasing=TRUE))#
+}
+x <- foreach(m = 1:3) %dopar% {simfun(m, nSim=10)}
+length(x)
+x[[1]]
+x[[2]]
+x[[3]]
+library(asmcjr)
+BMDS
+devtools:::install_github("asmcjr")
+devtools:::install_github("davidaarmstrong/asmcjr")
+library(asmcjr)
+BMDS
+data(nations)
+install.packages("caret")
+library(caret)
+help(train)
+install.packages("kernlab")
+library(kernlab)
+data(iris)
+lir <- lssvm(Species~.,data=iris)
+lir
+summary(lir)
+names(lir)
+names(iris)
+library(pdp)
+partial(lir, pred.var="Sepal.Length")
+partial(lir, pred.var="Sepal.Length", trian=iris)
+args(partial)
+partial.defauilt
+partial.default
+pdp:::partial.default
+partial(lir, pred.var="Sepal.Length", train=iris)
+partial(lir, pred.var="Sepal.Length", train=iris, type="regression")
+predict(lir)
+partial(lir, pred.var="Sepal.Length", train=iris, type="classification")
+UseMethod("predict")
+methods(predict)
+help(package=caret)
+x <- rnorm(250)
+z <- rnorm(250)
+dat <- read.csv("~/Dropbox/Alcantara/elections_2018.csv")
+install.packages("gpuR")
+library(grpU)
+library(gpuR)
+platformInfo
+platformInfo()
+detectGPUs()
+set.seed(123)#
+gpuA <- gpuMatrix(rnorm(16), nrow=4, ncol=4)#
+gpuB <- gpuA %*% gpuA
+library(uwo4419)
+data(alberta)
+barplotStats(alberta$sex)
+barplot
+barplot.default
+library(uwo4419)
+data(alberta)
+bartploStats(alberta$sex)
+barplotStats(alberta$sex)
+barplotStats(alberta$sex, pct=TRUE)
+barplotStats(alberta$sex, pct=TRUE, ylab="proportion")
+barplotStats(alberta$sex, pct=TRUE, ylab="proportion", ylim=c(.4,.5))
+?barplot
+write.csv(alberta, file="~/Dropbox/4419/slides/lecture1/alberta.csv")
+3+6+8+7+8+4+6+11+8+14+9+10+6+4+11+14+9+10+3+6+5+1+5+5+6+5+1+6+5+6+2+3+4+1
+jobs <- read.csv("~/Dropbox/Mikki/jobs.csv")
+jobs[1,]
+jobs$skills
+names(jobs)
+jobs$Skills
+jobs$Skills[1]
+cat(jobs$Skills[1])
+cat(as.character(jobs$Skills[1]))
+load("/Users/david/Downloads/Data/CES2015_Combined_R.RData")
+library(DAMisc)
+searchVarLabels(ces, "place")
+ls()
+searchVarLabels(CES2015_Combined, "place")
+library(car)
+library(carData)
+UN[1,]
+?UN
+mean(UN$ppgdp)
+mean(UN$ppgdp, na.rm=T)
+median(UN$ppgdp, na.rm=T)
+mean(UN$infantMortality, na.rm=T)
+median(UN$infantMortality, na.rm=T)
+mean(UN$lifeExpF, na.rm=T)
+median(UN$lifeExpF, na.rm=T)
+??add_column
+?merge
+??merge
+X <- rchisq(250*1000, 3)
+X
+X <- matrix(rchisq(250*1000, 3), ncol=1000)
+Xbar <- colMeans(X)
+Xbar.c <- sapply(1:1000, function(x)mean(Xbar[1:x]))
+lines(1:1000, Xbar.c)
+plot(1:1000, Xbar.c, type="l")
+abline(h=3)
+mean(c(X))
+plot(1:1000, Xbar.c, type="l", ylim=c(2,4)))
+plot(1:1000, Xbar.c, type="l", ylim=c(2,4))
+abline(h=3)
+X <- matrix(rchisq(1000*1000, 3), ncol=1000)#
+Xbar <- colMeans(X)#
+Xbar.c <- sapply(1:1000, function(x)mean(Xbar[1:x]))
+plot(1:1000, Xbar.c, type="l", ylim=c(2,4))
+abline(h=3)
+plot(1:1000, Xbar.c, type="l")
+abline(h=3)
+X <- matrix(rchisq(1000*10000, 3), ncol=10000)#
+Xbar <- colMeans(X)#
+Xbar.c <- sapply(1:10000, function(x)mean(Xbar[1:x]))
+plot(1:10000, Xbar.c, type="l")
+abline(h=3)
+Xm <- apply(X, 2, median)#
+Xm.c <- sapply(1:10000, function(x)mean(Xm[1:x]))
+plot(1:10000, Xm.c, type="l")
+med <- 3*(1-(2/27))^3
+med
+abline(h=med)
+s <- seq(0, 10, length=100)
+plot(s, dchisq(s, 3), type="l")
+s <- seq(0, 12.5, length=100)#
+plot(s, dchisq(s, 3), type="l", xlab="X", ylab="Density")#
+abline(v=3)#
+med <- 3*(1-(2/27))^3#
+abline(v = med, lty=2)#
+legend("topright", lty=c(1,2), legend=c("Mean", "Median"), inset=.01)
+med
+s <- seq(0, 12.5, length=100)#
+plot(s, dchisq(s, 3), type="l", xlab="X", ylab="Density")#
+abline(v=3)#
+med <- 3*(1-(2/27))^3#
+abline(v = med, lty=2)#
+legend("topright", lty=c(1,2), legend=c("Mean (3)", "Median (2.381)"), inset=.01)
+X <- matrix(rchisq(1000*10000, 3), ncol=10000)#
+Xbar <- colMeans(X)#
+Xbar.c <- sapply(1:10000, function(x)mean(Xbar[1:x]))#
+plot(1:10000, Xbar.c, type="l", xlab="# Samples", ylab="Mean")#
+abline(h=3)
+Xbar.c[10000]
+qnorm(.975)
+qt(.025, df=30)#
+qt(.975, df=30)
+pt(1.96, df=29)
+(1-pt(1.96, df=29))*2
+6/5
+(1-pt(1.96, df=119))*2
+.052/.05
+(1-pt(1.96, df=250))*2
+.0511/.05
+help(package=uwo4419)
+binomial.ci
+prop.ci
+?binom.test
+binom.test(100, 250, .5)
+pbinom(c(.025,.975), 250, .5)
+qbinom(c(.025,.975), 250, .5)
+qbinom(c(.025,.975), 250, .5)/250
+qbinom(c(.025,.975), 250, .4)
+qbinom(c(.025,.975), 250, .4)/250
+binom.test
+qbeta
+qbeta(.975, 100, 151)
+qbeta(.975, 101, 150)
+qbeta(.052, 101, 150)
+qbeta(.025, 101, 150)
+x <- 100
+n <- 250
+p <- x/n
+conf.level=.95
+zcrit <- qnorm(1-(conf.level/2))#
+  norm.ci <- p + c(-1,1)*zcrit * sqrt((p*(1-p))/n)#
+  binom.ci <- c(qbeta((1-conf.level)/2, x, n - x + 1), qbeta(1 - ((1-conf.level)/2), x + 1, n - x))
+norm.ci
+binom.ci
+zcrit
+zcrit <- qnorm(abs((1-conf.level)/2))
+zcrit
+zcrit <- abs(qnorm((1-conf.level)/2))#
+  norm.ci <- p + c(-1,1)*zcrit * sqrt((p*(1-p))/n)#
+  binom.ci <- c(qbeta((1-conf.level)/2, x, n - x + 1), qbeta(1 - ((1-conf.level)/2), x + 1, n - x))
+norm.ci
+binom.ci
+prop.ci <- function(x, n, conf.level=.95, ...){#
+  if(length(x) > 1){#
+    n <- length(x)#
+    p <- mean(x)#
+  }#
+  else{#
+    p <- x/n#
+  }#
+  zcrit <- abs(qnorm((1-conf.level)/2))#
+  norm.ci <- p + c(-1,1)*zcrit * sqrt((p*(1-p))/n)#
+  binom.ci <- c(qbeta((1-conf.level)/2, x, n - x + 1), qbeta(1 - ((1-conf.level)/2), x + 1, n - x))#
+  out <- rbind(norm.ci, binom.ci)#
+  colnames(out) <- c("Lower", "Upper")#
+  rownames(out) <- c("Normal Approx", "Exact")#
+  return(out)#
+}
+prop.ci(100, 250
+)
+library(haven)
+library(uwo4419)
+library(DAMisc)
+library(haven)
+library(uwo4419)
+wvs <- read_dta("~/Downloads/WV6_Stata_v_2016_01_01.dta")
+wvs <- read_dta("~/Downloads/WV6_Stata_v_2016_01_01.dta", encoding="UTF-8")
+wvs$V2 <- as_factor(wvs$V2)
+library(dplyr)
+wvs %>% group_by(V2) %>% summarise(sat = mean(V23, na.rm=T))
+satis <- wvs %>% group_by(V2) %>% summarise(sat = mean(V23, na.rm=T))
+sort(satis)
+satis[order(satis[,2]), ]
+orer(satis$sat)
+order(satis$sat)
+satis[order(satis$sat), ]
+as.data.frame(satis[order(satis$sat), ])
+quit('no')
+library(carData)
+t.test(prestige ~ type, data=subset(Duncan, type!= "wc"))
+t.test(prestige ~ type, data=subset(Duncan, type!= "wc"), var.equal=TRUE)
+t.test(prestige ~ type, data=subset(Duncan, type!= "wc"), var.equal=FALSE)
+18.055/sqrt(21)
+18.055/sqrt(20)
+library(shiny)
+?req
+?is.truthy
+?truthy
+help(package="shiny")
+isTruthy
+version
+library(runjags)
+?run.jags
+setwd("~/Dropbox (DaveArmstrong)/India")
+load("india_stan_data.rda")
+stan.code
+cat(stan.code, file="stan_model.txt")
+setwd("~/DyadRatios")
+devtools:::use_vignette("extract-vignette")
+library(DyadRatios)
+help(package="DyadRatios")
