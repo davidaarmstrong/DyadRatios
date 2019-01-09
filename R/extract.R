@@ -1,5 +1,5 @@
 extract <-
-function(varname,date,index,ncases=NULL,unit="A",mult=1,begindt=NA,enddt=NA,npass=1,smoothing=TRUE,endmonth=12) {
+function(varname,date,index,ncases=NULL,unit="A",mult=1,begindt=NA,enddt=NA,npass=1,smoothing=TRUE,endmonth=12, plot=FALSE) {
   formula<-match.call(extract)
   csign <- NULL
   nrecords<- length(varname)
@@ -230,20 +230,21 @@ function(varname,date,index,ncases=NULL,unit="A",mult=1,begindt=NA,enddt=NA,npas
       mood[fb,p] <- ((mood[fb,p] - moodmean) * wtstd / sdmood) + wtmean
     } #end for
 
-    #plot commands
-    t<- seq(1:nperiods) #time counter used for plot below
-    lo<- 50 #force scale of iterative plot to large range
-    hi<- 150
-    if (min(mood[3,]) < lo) lo=min(mood[3,]) #whichever larger, use
-    if (max(mood[3,]) > hi) hi=max(mood[3,])
-    dummy<- rep(lo,nperiods) #dummy is fake variable used to set plot y axis to 50,150
-    dummy[nperiods]<- hi
-    if (iter==0) {
-      plot(t,dummy,type="l",lty=0,xlab="Time Period",ylab="Estimate by iteration",main="Estimated Latent Dimension") #create box, no visible lines
-      } else {
-      lines(t,mood[3,],col=iter)
-    }  
-
+    if(plot){
+      #plot commands
+      t<- seq(1:nperiods) #time counter used for plot below
+      lo<- 50 #force scale of iterative plot to large range
+      hi<- 150
+      if (min(mood[3,]) < lo) lo=min(mood[3,]) #whichever larger, use
+      if (max(mood[3,]) > hi) hi=max(mood[3,])
+      dummy<- rep(lo,nperiods) #dummy is fake variable used to set plot y axis to 50,150
+      dummy[nperiods]<- hi
+      if (iter==0) {
+        plot(t,dummy,type="l",lty=0,xlab="Time Period",ylab="Estimate by iteration",main="Estimated Latent Dimension") #create box, no visible lines
+        } else {
+        lines(t,mood[3,],col=iter)
+      }  
+    }
     iter <- iter + 1 
     if (auto == "y") r<- iscorr(issue,mood) else auto <- "y"   #recompute correlations
 
