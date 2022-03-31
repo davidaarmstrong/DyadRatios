@@ -7,7 +7,7 @@ Estimates the Dyad Ratios Algorithm for constructing latent time series from sur
 \usage{
 extract(varname, date, index, ncases = NULL, unit = "A", mult = 1, 
   begindt = NA, enddt = NA, npass = 1, smoothing = TRUE, 
-  endmonth = 12, plot=FALSE)
+  endmonth = 12, plot=FALSE, verbose=FALSE)
 }
 %- maybe also 'usage' for other objects documented here.
 \arguments{
@@ -23,6 +23,7 @@ extract(varname, date, index, ncases = NULL, unit = "A", mult = 1,
   \item{smoothing}{Specifies whether or not exponential smoothing is applied to the intermediate estimates during the iterative solution process.  Defaults to \code{TRUE}. }
   \item{endmonth}{Ending month of the analysis. }
   \item{plot}{Logical indicating whether a plot of the latent variable should be generated.}
+  \item{verbose}{Logical indicating whether printed output should be sent to console.}
 }
 \value{
 A list with the following elements
