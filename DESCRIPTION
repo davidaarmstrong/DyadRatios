@@ -1,9 +1,9 @@
 Package: DyadRatios
 Type: Package
 Title: Dyad Ratios Algorithm
-Version: 1.0
-Date: 2019-01-04
-Authors@R: c(person("Dave", "Armstrong", role=c("cre"), email="dave@quantoid.net"), 
+Version: 1.1
+Date: 2024-05-15
+Authors@R: c(person("Dave", "Armstrong", role=c("cre"), email="davearmstrong.ps@gmail.com"), 
              person("Stimson", "James", role=c("aut"))) 
 Description: Estimates the Dyad Ratios Algorithm for pooling and smoothing poll estimates. 
 License: GPL (>=2)
