@@ -1,7 +1,7 @@
 importFrom("graphics", "legend", "lines", "par", "plot")
 importFrom("stats", "cor", "lm", "optim", "sd", "var")
 
-export(extract, plot.extract, summary.extract, display)
+export(extract, plot.extract, summary.extract, display, display.extract)
 S3method(plot, extract)
 S3method(summary, extract)
 S3method(display, extract)

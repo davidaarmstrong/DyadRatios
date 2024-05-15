@@ -1,4 +1,5 @@
-\name{display.extract}
+\name{display}
+\alias{display}
 \alias{display.extract}
 \title{Display method for Dyad Ratios Algorithm Result
 }
