@@ -21,7 +21,7 @@ function(varname,date,index,ncases,mindate,maxdate,nperiods,nvar,aggratio,unit,m
     qu <- 1 + as.integer((mo - 1)/3)
     dy <- findday(date[record])
     yr <- findyear(date[record])
-    curdate<- as.integer(date[record])
+    curdate<- as.integer(date[record])/86400
     if (curdate >= mind &&  curdate <= maxd) {  #is date within range?
     nkeep <- nkeep + 1
     if (nkeep==1) { #startup routine for first good case

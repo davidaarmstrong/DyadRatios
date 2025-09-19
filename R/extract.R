@@ -1,5 +1,5 @@
 extract <-
-function(varname,date,index,ncases=NULL,unit="A",mult=1,begindt=NA,enddt=NA,npass=1,smoothing=TRUE,endmonth=12, plot=FALSE, verbose=FALSE) {
+function(varname,date,index,ncases=NULL,unit="A",mult=1,begindt=NA,enddt=NA,npass=1,smoothing=TRUE,endmonth=12) {
   formula<-match.call(extract)
   csign <- NULL
   nrecords<- length(varname)
@@ -41,7 +41,8 @@ function(varname,date,index,ncases=NULL,unit="A",mult=1,begindt=NA,enddt=NA,npas
   wtmean<- 0 #for it=1
   wtstd<- 1
   fract<- 1
-
+  iter_hist <- NULL
+  dropped <- NULL
   if (unit=="A") {
     nperiods<- maxy-miny+1
     aggratio<- 1
@@ -95,7 +96,8 @@ function(varname,date,index,ncases=NULL,unit="A",mult=1,begindt=NA,enddt=NA,npas
   period<- numeric(nperiods)
   converge<- 0
   evalue<- 0
-
+  evalue1 <- 0
+  evalue2 <- NULL
   # create numeric variable period, eg, yyyy.0m 
   if (unit=="D") {
     period<-seq(1:nperiods) 
@@ -136,9 +138,7 @@ function(varname,date,index,ncases=NULL,unit="A",mult=1,begindt=NA,enddt=NA,npas
     if (nissue[v]>npass) std[v]<- sqrt(var(issue[,v],na.rm=TRUE)) #this is just a test for variance >0
     if (std[v]<.001) {  #case dropped if std uncomputable (NA) or actually zero (constant)
       ndrop<- ndrop+1
-      if(verbose){
-        message(paste("Series",vl[v],"discarded.  After aggregation cases =",nissue[v]))
-      }
+      dropped <- rbind(dropped, data.frame(Dropped = vl[v], N_remain = nissue[v]))
     }
     }
   nvarold<- nvar
@@ -188,22 +188,10 @@ function(varname,date,index,ncases=NULL,unit="A",mult=1,begindt=NA,enddt=NA,npas
     }
     #READY FOR ESTIMATION, SET UP AND PRINT OPTIONS INFO     
     out<- as.character(10) #initial length only
-    if(verbose){
-    out[1]<- print(paste("Estimation report:"))
-    if (pass == 1) {
-      if (months >= 12) {
-        out[2]<- print(paste("Period:", miny, " to", maxy,"     ", nperiods, " time points"))
-      } else {
-        out[2]<- print(paste("Period:", miny,  minper, " to", maxy, maxper, nperiods, " time points"))
-      }
-      out[3]<- print(paste("Number of series: ", nvar+ndrop))
-      out[4]<- print(paste("Number of usable series: ", nvar))
-      out[5]<- print(paste("Exponential smoothing: ",smoothing))
-    }
-    out[6]<- print(paste("Iteration history: Dimension ",pass))
-    print(" ")
-    out[7]<- print("Iter Convergence Criterion Reliability Alphaf Alphab")
-    outcount<- 7
+    setup <- list(start = miny, end = maxy, nperiods = nperiods, used_series = nvar, unused_series = ndrop, smoothiing=smoothing)
+    if(!is.null(minper)){
+      setup$minper <- minper
+      setup$maxper <- maxper
     }
     for (p in 1:nperiods) {
       count[p]<- sum(!is.na(issue[p,]))
@@ -233,21 +221,6 @@ function(varname,date,index,ncases=NULL,unit="A",mult=1,begindt=NA,enddt=NA,npas
       mood[fb,p] <- ((mood[fb,p] - moodmean) * wtstd / sdmood) + wtmean
     } #end for
 
-    if(plot){
-      #plot commands
-      t<- seq(1:nperiods) #time counter used for plot below
-      lo<- 50 #force scale of iterative plot to large range
-      hi<- 150
-      if (min(mood[3,]) < lo) lo=min(mood[3,]) #whichever larger, use
-      if (max(mood[3,]) > hi) hi=max(mood[3,])
-      dummy<- rep(lo,nperiods) #dummy is fake variable used to set plot y axis to 50,150
-      dummy[nperiods]<- hi
-      if (iter==0) {
-        plot(t,dummy,type="l",lty=0,xlab="Time Period",ylab="Estimate by iteration",main="Estimated Latent Dimension") #create box, no visible lines
-        } else {
-        lines(t,mood[3,],col=iter)
-      }  
-    }
     iter <- iter + 1 
     if (auto == "y") r<- iscorr(issue,mood) else auto <- "y"   #recompute correlations
 
@@ -269,7 +242,8 @@ function(varname,date,index,ncases=NULL,unit="A",mult=1,begindt=NA,enddt=NA,npas
         evalue <- evalue + vratio * r[v]^2
         totalvar <- totalvar + vratio
       } #end if
-  
+      evalue1 <- evalue
+      totalvar1 <- totalvar
       #convergence tests
       if (wn > 3) {
        conv <- abs(r[v] - oldr[v])      #conv is convergence test for item=v
@@ -294,16 +268,11 @@ function(varname,date,index,ncases=NULL,unit="A",mult=1,begindt=NA,enddt=NA,npas
       wtstd <- std1 #*unexp
     } #end if
     fbcorr <- cor(mood[1,],mood[2,]) #fnfrontback 
-
     if (quit != 1) {
-      if(verbose){
-      outcount<- outcount+1
-      }
       cv<- format(round(converge,4),nsmall=4) 
       itfmt<-format(round(iter),justify="right",length=4)
-      if(verbose){
-      out[outcount]<- print(paste(itfmt,"       ",cv,"   ",round(tola,4),"    ",round(fbcorr,3),round(alpha1,4),round(alpha,4)))
-      }
+      iter_hist <- rbind(iter_hist, data.frame(Dimension = paste0("Dimension ", pass), Iter = itfmt, Convergence = cv, Criterion = tola, 
+                                                Reliability = fbcorr, Alphaf = alpha1, Alphab = alpha))
       }
     if (converge > lastconv)  tola <- tola * 2
     lastconv <- converge
@@ -329,25 +298,21 @@ function(varname,date,index,ncases=NULL,unit="A",mult=1,begindt=NA,enddt=NA,npas
     if (pass == 1) {
       expprop <- evalue / totalvar
       tot1 <- totalvar
+      tot_var <- tot1
+      expprop1 <- expprop
     } else {
       erel <- evalue / totalvar          #% exp relative
       totalvar <- (1 - expprop) * tot1   #true var=original var discounted by %exp
       evalue <- erel * totalvar          #rescale to retain %exp relationship
       expprop <- evalue / tot1           #now reduce eral to expprop
+      evalue2 <- evalue
+      expprop2 <- expprop
     } #    end if
 
     for (v in 1:nvar) {
       N[v]<- sum(!is.na(issue[,v]))
       }
     var.out<- list(varname=vl,loadings=r,means=av,std.deviations=std)
-    if(verbose){
-    print(" ")  
-    outcount<- outcount+1
-    out[outcount]<- print(paste("Eigen Estimate ", round(evalue,2), " of possible ",round(tot1,2)))  
-    outcount<- outcount+1
-    out[outcount]<- print(paste("  Percent Variance Explained: ",round(100 * expprop,2)))
-    }  
-    
     if (pass !=  2 && npass>1) {
       for (v in 1:nvar) { 
         valid[v] <- 0               #reset all, regmoodissue will set good=1
@@ -355,30 +320,69 @@ function(varname,date,index,ncases=NULL,unit="A",mult=1,begindt=NA,enddt=NA,npas
        } #v loop
     }  # if
     #begin prn output routine # mood[fb,] is now our estimate,    WHAT ABOUT A SECOND DIMENSION
+    
+    var_exp <- data.frame(Dimension =  "Dimension 1", 
+               Variance = evalue1, 
+               Proportion = expprop1)
+    if(!is.null(evalue2)){
+      var_exp <- rbind(var_exp, 
+                       data.frame(Dimension = "Dimension 2", 
+                                  Variance = evalue2, 
+                                  Proportion = expprop2))
+    }
+    
     latent<- mood[fb,] #vector holds values for output
     if (pass == 1) latent1<- latent #hold first dimension
-    if(verbose){
-      print(" ")
-      out[outcount+1]<- print(paste("Final Weighted Average Metric:  Mean: ",round(wtmean,2)," St. Dev: ",round(wtstd,2)))
-    }
     #for Zelig output
     if (npass==1) {
-      extract.out<- list(formula=formula,T=nperiods,nvar=nvar,unit=unit,dimensions=npass,period=period,varname=vl,N=N,means=av,std.deviations=std,setup1=out1,loadings1=r1,latent1=latent1)
+      extract.out<- list(formula=formula,
+                         T=nperiods,
+                         nvar=nvar,
+                         unit=unit,
+                         dimensions=npass,
+                         period=period,
+                         varname=vl,
+                         N=N,
+                         means=av,
+                         std.deviations=std,
+                         setup1=out1,
+                         loadings1=r1,
+                         latent1=latent1, 
+                         hist = iter_hist, 
+                         totalvar = totalvar1, 
+                         var_exp = var_exp, 
+                         dropped=dropped, 
+                         smoothing = smoothing)
     } else {
-    if(verbose){
-      for (i in 6:outcount) {
-      out[i-5]=out[i]
-    }
-    length(out)<- outcount-5
-    
-    }
-      
-    extract.out<- list(formula=formula,T=nperiods,nvar=nvar,unit=unit,dimensions=npass,period=period,varname=vl,N=N,means=av,std.deviations=std,setup1=out1,loadings1=r1,latent1=latent1,setup2=out,loadings2=r,latent2=latent)
+    extract.out<- list(formula=formula,
+                       T=nperiods,
+                       nvar=nvar,
+                       unit=unit,
+                       dimensions=npass,
+                       period=period,
+                       varname=vl,
+                       N=N,
+                       means=av,
+                       std.deviations=std,
+                       setup1=out1,
+                       loadings1=r1,
+                       latent1=latent1,
+                       setup2=out,
+                       loadings2=r,
+                       latent2=latent, 
+                       hist = iter_hist,
+                       totalvar = totalvar1, 
+                       var_exp = var_exp, 
+                       dropped=dropped, 
+                       smoothing = smoothing)
     }
     } #end if auto="y" 
   } #end of for pass=1,2 loop 
 
-  par(col=1) #reset on termination
+  # par(col=1) #reset on termination
   class(extract.out)<- "extract"
   return(extract.out)
   }
+
+
+

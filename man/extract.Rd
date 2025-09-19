@@ -7,7 +7,7 @@ Estimates the Dyad Ratios Algorithm for constructing latent time series from sur
 \usage{
 extract(varname, date, index, ncases = NULL, unit = "A", mult = 1, 
   begindt = NA, enddt = NA, npass = 1, smoothing = TRUE, 
-  endmonth = 12, plot=FALSE, verbose=FALSE)
+  endmonth = 12)
 }
 %- maybe also 'usage' for other objects documented here.
 \arguments{
@@ -22,8 +22,6 @@ extract(varname, date, index, ncases = NULL, unit = "A", mult = 1,
   \item{npass}{Not yet implemented.}
   \item{smoothing}{Specifies whether or not exponential smoothing is applied to the intermediate estimates during the iterative solution process.  Defaults to \code{TRUE}. }
   \item{endmonth}{Ending month of the analysis. }
-  \item{plot}{Logical indicating whether a plot of the latent variable should be generated.}
-  \item{verbose}{Logical indicating whether printed output should be sent to console.}
 }
 \value{
 A list with the following elements
@@ -38,5 +36,5 @@ A list with the following elements
 }
 
 \references{
-Stimson, J. A. (2018) \sQuote{The Dyad Ratios Algorithm for Estimating Latent Public Opinion: Estimation, Testing, and Comparison to Other Approaches}, Bulletin of Sociological Methodology/Bulletin de Méthodologie Sociologique, 137–138(1), pp. 201–218. doi: 10.1177/0759106318761614.
+Stimson, J. A. (2018) \sQuote{The Dyad Ratios Algorithm for Estimating Latent Public Opinion: Estimation, Testing, and Comparison to Other Approaches}, Bulletin of Sociological Methodology/Bulletin de Méthodologie Sociologique, 137–138(1), pp. 201–218. doi:10.1177/0759106318761614.
 }
