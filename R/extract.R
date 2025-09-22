@@ -1,31 +1,121 @@
-extract <-
-function(varname,date,index,ncases=NULL,unit="A",mult=1,begindt=NA,enddt=NA,npass=1,smoothing=TRUE,endmonth=12) {
+#' Dyad Ratios Algorithm
+#'
+#' Estimates the Dyad Ratios Algorithm for constructing latent time series from
+#' survey-research marginals.
+#'
+#' @name extract
+#' @aliases extract
+#' @param varname String giving the name of the input series to be smoothed.
+#'   This should identify similar or comparable values in the series. Values in
+#'   the series that have the same \code{varname} will be assumed to come from
+#'   the same source.
+#' @param date ISO numeric representation of the date the survey was in the
+#'   field (usually the start, end, or median date).
+#' @param index Numeric value of the series. It might be a percent or proportion
+#'   responding in a single category (e.g., the approve response in presidential
+#'   approval) or some multi-response summary. For ease of interpretation,
+#'   polarity should be the same for all items.
+#' @param ncases Number of cases (e.g., sample size) of the survey. This provides
+#'   differential weighting for the values. Setting this to \code{NULL} or
+#'   leaving it blank will weight each value equally.
+#' @param unit Aggregation period—one of \sQuote{D} (daily), \sQuote{M}
+#'   (monthly), \sQuote{Q} (quarterly), \sQuote{A} (annual), or \sQuote{O}
+#'   (multi-year aggregation).
+#' @param mult Number of years, only used if \code{unit} is \sQuote{O}.
+#' @param begindt Beginning date of the analysis. Defaults to earliest date in
+#'   the dataset. Should be specified with \code{lubridate::ymd()}.
+#' @param enddt Ending date for the analysis. Defaults to the latest date in the
+#'   data.
+#' @param npass Not yet implemented.
+#' @param smoothing Logical. Specifies whether exponential smoothing is applied
+#'   to the intermediate estimates during the iterative solution process.
+#'   Defaults to \code{TRUE}.
+#' @param endmonth Ending month of the analysis.
+#'
+#' @return A list with components:
+#' \itemize{
+#'   \item \code{call}: The initial call to `extract()`. 
+#'   \item \code{T}: Number of aggregation periods.
+#'   \item \code{nvar}: Number of series used in the analysis.
+#'   \item \code{unit}: The aggregation period.
+#'   \item \code{dimensions}: Number of dimensions estimated (1 or 2).
+#'   \item \code{period}: List of aggregation periods.
+#'   \item \code{varname}: List in order of the variables used in the analysis.
+#'   \item \code{N}: Number of non-missing observations for each series.
+#'   \item \code{wtdmean}: The weighted mean of the input variables. 
+#'   \item \code{wtstd}: The weighted standard deviation of the input series. 
+#'   \item \code{means}: Item descriptive information.
+#'   \item \code{std.deviations}: Item descriptive information.
+#'   \item \code{setup1}: Basic information about the options and iterative solution for the first dimension.
+#'   \item \code{setup2}: Basic information about the options and iterative solution for the second dimension, if applicable.
+#'   \item \code{loadings1}: Item–scale correlations from the first dimension of the final solution.
+#'     Their square is the validity estimate used in weighting.
+#'   \item \code{loadings2}: Item–scale correlations from the second dimension of the final solution, if applicable.
+#'   \item \code{latent1}: Estimated time series for first dimension.
+#'   \item \code{latent2}: Estimated time series for second dimension, if applicable.
+#'   \item \code{hist}: Data frame with iteration history, including convergence statistics.
+#'   \item \code{totalvar}: Total variance in the data that could be explained by the estimated dimensions.
+#'   \item \code{var_exp}: Data frame with variance explained and proportion of variance explained for each dimension.
+#'   \item \code{dropped}: Data frame listing any series that were dropped from the analysis due to insufficient data.
+#'   \item \code{smoothing}: Logical indicating whether smoothing was applied during the iterative solution process.
+#' }
+#'
+#' @references
+#' Stimson, J. A. (2018).
+#' \sQuote{The Dyad Ratios Algorithm for Estimating Latent Public Opinion:
+#' Estimation, Testing, and Comparison to Other Approaches},
+#' \emph{Bulletin of Sociological Methodology/Bulletin de Méthodologie
+#' Sociologique}, 137–138(1), 201–218. \doi{10.1177/0759106318761614}
+#'
+#' @importFrom stats cor lm optim sd var
+#' @importFrom graphics legend lines par plot 
+#' @importFrom lubridate ymd year month day quarter
+#' 
+#' @usage NULL
+#' @export
+#'
+#' @examples
+#' data(jennings)
+#' dr_out <- extract(varname = jennings$variable, 
+#'                   date = jennings$date, 
+#'                   index = jennings$value, 
+#'                   ncases = jennings$n, 
+#'                   begindt = min(jennings$date), 
+#'                   enddt = max(jennings$date), 
+#'                   npass=1)
+#' summary(dr_out)
+#' 
+extract <- function(varname,date,index,ncases=NULL,unit="A",mult=1,begindt=NA,enddt=NA,npass=1,smoothing=TRUE,endmonth=12) {
   formula<-match.call(extract)
   csign <- NULL
   nrecords<- length(varname)
   if (is.null(ncases)) ncases<- rep(0,nrecords)
-  moddate<- date #create temporary date vector, leaving original unmodified
+  moddate <- date #create temporary date vector, leaving original unmodified
   if ((unit=="A" || unit=="O") && endmonth<12) {
     for (i in 1:nrecords) { #first loop through raw data file
-      month<- findmonth(moddate[i])
-      year<- findyear(moddate[i])
-      if (month>endmonth) moddate[i]<- ISOdate(year+1,1,1) #modified date become 1/1 of next year
+      month<- month(moddate[i])
+      year<- year(moddate[i])
+      if (month>endmonth) moddate[i]<- ymd(paste(year, "01", "01", sep="-"), tz="GMT") #modified date become 1/1 of next year
     } #end loop through data
   } # end if
 
-  if (is.na(begindt)) minper<-findmonth(min(moddate)) else minper<-findmonth(begindt)
-  if (is.na(begindt)) miny<-findyear(min(moddate)) else miny<-findyear(begindt)
-  if (is.na(begindt)) minday<-findday(min(moddate)) else minday<-findday(begindt)
-  if (is.na(enddt)) maxper<-findmonth(max(moddate)) else maxper<-findmonth(enddt)
-  if (is.na(enddt)) maxy<-findyear(max(moddate)) else maxy<-findyear(enddt)
-  if (is.na(enddt)) maxday<-findday(max(moddate)) else maxday<-findday(enddt)
+  if (is.na(begindt)) minper<-month(min(moddate)) else minper<-month(begindt)
+  if (is.na(begindt)) miny<-year(min(moddate)) else miny<-year(begindt)
+  if (is.na(begindt)) minday<-day(min(moddate)) else minday<-day(begindt)
+  if (is.na(enddt)) maxper<-month(max(moddate)) else maxper<-month(enddt)
+  if (is.na(enddt)) maxy<-year(max(moddate)) else maxy<-year(enddt)
+  if (is.na(enddt)) maxday<-day(max(moddate)) else maxday<-day(enddt)
   if (unit=="Q") {
     minper<- as.integer((minper-1)/3)+1
     maxper<- as.integer((maxper-1)/3)+1
   }
-  mindate<- ISOdate(miny,minper,minday,0,0,0,tz="GMT")
-  maxdate<- ISOdate(maxy, maxper, maxday,0,0,0,tz="GMT") #86400=24*60*60
+  # mindate<- ISOdate(miny,minper,minday,0,0,0,tz="GMT")
+  # maxdate<- ISOdate(maxy, maxper, maxday,0,0,0,tz="GMT") #86400=24*60*60
 
+  mindate <- lubridate::ymd(paste(miny, minper, minday, sep="-"), tz="GMT")
+  maxdate <- lubridate::ymd(paste(maxy, maxper, maxday, sep="-"), tz="GMT")
+  
+  
   #SETCONS:
   latent<- numeric(1)
   aggratio<- 0
@@ -71,7 +161,7 @@ function(varname,date,index,ncases=NULL,unit="A",mult=1,begindt=NA,enddt=NA,npas
   }
   if (unit=="D") {
     months=1
-    nperiods<- (as.integer(maxdate)-as.integer(mindate))/86400 + 1 #86400=24*60*60
+    nperiods<- (as.integer(maxdate)-as.integer(mindate)) + 1 
   }
 
   arinv<- 1/aggratio
@@ -335,7 +425,7 @@ function(varname,date,index,ncases=NULL,unit="A",mult=1,begindt=NA,enddt=NA,npas
     if (pass == 1) latent1<- latent #hold first dimension
     #for Zelig output
     if (npass==1) {
-      extract.out<- list(formula=formula,
+      extract.out<- list(call=formula,
                          T=nperiods,
                          nvar=nvar,
                          unit=unit,
@@ -343,6 +433,8 @@ function(varname,date,index,ncases=NULL,unit="A",mult=1,begindt=NA,enddt=NA,npas
                          period=period,
                          varname=vl,
                          N=N,
+                         wtdmean=wtmean,
+                         wtdstd=wtstd,
                          means=av,
                          std.deviations=std,
                          setup1=out1,
@@ -354,7 +446,7 @@ function(varname,date,index,ncases=NULL,unit="A",mult=1,begindt=NA,enddt=NA,npas
                          dropped=dropped, 
                          smoothing = smoothing)
     } else {
-    extract.out<- list(formula=formula,
+    extract.out<- list(call=formula,
                        T=nperiods,
                        nvar=nvar,
                        unit=unit,
@@ -362,6 +454,8 @@ function(varname,date,index,ncases=NULL,unit="A",mult=1,begindt=NA,enddt=NA,npas
                        period=period,
                        varname=vl,
                        N=N,
+                       wtdmean=wtmean,
+                       wtdstd=wtstd,
                        means=av,
                        std.deviations=std,
                        setup1=out1,
@@ -383,6 +477,7 @@ function(varname,date,index,ncases=NULL,unit="A",mult=1,begindt=NA,enddt=NA,npas
   class(extract.out)<- "extract"
   return(extract.out)
   }
+
 
 
 

@@ -1,24 +1,37 @@
-plot.extract <-
-function(x, ...) {
-  dim<- x$dimensions
-  T<- x$T
-  vect1<-x$latent1
-  t<-seq(1:T)
-  if (dim>1) {
-    vect2<-x$latent2
-    miny<-min(vect1)
-    if (miny>min(vect2)) miny<-min(vect2)
-    maxy<-max(vect1)
-    if (maxy<max(vect2)) maxy<-max(vect2)
-    dummy<-rep(miny,T-1) #dummy is a fake variable used to reset axes to handle min/max of both series
-    dummy[T]<-maxy
-    leg.text<-c("","Dimension 1","Dimension 2")
-    plot(t,dummy,type="l",lty=0,main="Final Estimation Results: Two Dimensions",xlab="Time Point",ylab="Latent Variables", ...)
-    lines(t,vect1,col=1)
-    lines(t,vect2,col=2)
-    legend(1,maxy,leg.text,col=c(0,1,2),lty=c(0,1,1))
-  } else {
-    plot(t,vect1,type="l",main="Final Estimation Results",xlab="Time Point",ylab="Latent Variable", ...)
-    if (dim == 2) lines(t,vect2,col=2)
-    }
+globalVariables(c("period", "latent1", "latent2"))
+
+#' Plot Method for the extract Function. 
+#' 
+#' This function generates a line plot of the latent variable estimates obtained from the `extract()` function. It can handle both one-dimensional and two-dimensional latent variable estimates.
+#' 
+#' @param x An object of class "extract", typically a result of the `extract()` function.
+#' @param ... Additional graphical parameters to be passed to the plot function.
+#' @return A ggplot of the latent variable estimate(s) over time. 
+#' @usage NULL
+#' @method plot extract
+#' @importFrom ggplot2 ggplot geom_line labs aes
+#' @export
+#' @examples
+#' data(jennings)
+#' dr_out <- extract(varname = jennings$variable, 
+#'                   date = jennings$date, 
+#'                   index = jennings$value, 
+#'                   ncases = jennings$n, 
+#'                   begindt = min(jennings$date), 
+#'                   enddt = max(jennings$date), 
+#'                   npass=1)
+#' plot(dr_out)
+plot.extract <- function(x, ...) {
+  mood <- get_mood(x)
+  if(!("latent2" %in% names(x))){
+    g <- ggplot(mood, aes(x=period, y=latent1)) + 
+      geom_line() +
+      labs(x="Time Period", y="Dimension 1 Estimate") 
+  }else{
+    g <- ggplot(mood, aes(x=period)) + 
+      geom_line(aes(y=latent1, color="Dimension 1")) +
+      geom_line(aes(y=latent2, color="Dimension 2")) +
+      labs(x="Time Period", y="Latent Variable Estimates", color="Legend") 
+  }
+  return(g)
   }

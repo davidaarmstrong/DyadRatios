@@ -1,3 +1,5 @@
+#' calculates mmood - low level function called by extract, not intended to be called by the user. 
+#' @noRd
 dominate <-
 function(fb,issue,nperiods,nvar,mood,valid,smoothing,alpha,csign) {
 nitems<- numeric(nperiods)

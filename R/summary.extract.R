@@ -1,5 +1,24 @@
-summary.extract <-
-function(object, ...) {
+#' Summary Method for extract Objects
+#' 
+#' Prints a summary from objects estimated with the the extract function. 
+#' 
+#' @param object An object of class "extract", typically a result of the extract function.
+#' @param ... Other arguments to be passed down (currently unused).
+#' @return A data frame with variables for the question name, number of cases, loading as well as mean and standard deviation of the series. 
+#' @usage NULL
+#' @method summary extract
+#' @export
+#' @examples
+#' data(jennings)
+#' dr_out <- extract(varname = jennings$variable, 
+#'                   date = jennings$date, 
+#'                   index = jennings$value, 
+#'                   ncases = jennings$n, 
+#'                   begindt = min(jennings$date), 
+#'                   enddt = max(jennings$date), 
+#'                   npass=1)
+#' summary(dr_out)
+summary.extract <- function(object, ...) {
   T=object$T
   nvar=object$nvar
   dim<- object$dimensions

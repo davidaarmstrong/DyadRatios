@@ -1,3 +1,5 @@
+#' Function to perform exponential smoothing - low level function called by extract, not intended to be called by the user. 
+#' @noRd
 esmooth <-
 function(mood, fb, alpha){ 
 ##########################################################################################

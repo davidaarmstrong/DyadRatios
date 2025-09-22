@@ -1,7 +1,6 @@
 ---
 title: "Documentation for the Dyad Ratios Algorithm"
-author: "James Stimson"
-date: "July, 2018"
+author: "James Stimson with light editing and updating by Dave Armstrong"
 output: rmarkdown::html_vignette
 vignette: >
   %\VignetteIndexEntry{Documentation for the Dyad Ratios Algorithm}
@@ -18,7 +17,7 @@ knitr::opts_chunk$set(
 
 ## General
 
-"extract" is an R function which implements the dyad ratios algorithm described in Stimson (2018) for constructing a latent time series from the raw materials of survey research marginals. It inputs data in archival form, as dated survey results, aggregates them into regular periods selected at run time, and extracts the latent dimension(s) which best account for the raw series.
+`extract()` is an R function which implements the dyad ratios algorithm described in Stimson (2018) for constructing a latent time series from the raw materials of survey research marginals. It inputs data in archival form, as dated survey results, aggregates them into regular periods selected at run time, and extracts the latent dimension(s) which best account for the raw series.
 
 Although its central mathematics is entirely different - based upon ratios of comparable observed series rather than covariance of "variables" - its behavior is strongly analogous to extraction of a "factor score" in standard (iterative) principal components analysis.
 
@@ -27,7 +26,7 @@ Although its central mathematics is entirely different - based upon ratios of co
 The routine is called from R by the command:
 
 ```{r, eval=FALSE}
-output<- extract(varname, date, index, ncases, 
+output<- extract(varname, date, index, ncases=NULL, 
   unit="A", mult=1, begindt=NA, enddt=NA, npass=1,
   smoothing=TRUE, endmonth=12)
 ```
@@ -37,7 +36,7 @@ The first three arguments must be specified by the user, others are optional:
 
   1. `varname` is an $n$-length vector containing names given to input series. The routine assumes that any two observations with the same name are comparable and that any change in name signals noncomparability. Ratios are computed only between comparable observations.
 
-  2. `date` is an $n$-length vector of dates, typically one of the dates of survey field work (e.g., first, last, or median day). It is recorded as an ISO numeric representation of all possible calendar dates. (See below for further documentation.)
+  2. `date` is an $n$-length vector of dates, typically one of the dates of survey field work (e.g., first, last, or median day). This should be recorded in a date format.  For example, if you had the string "2025-01-01", you could use `lubridate::ymd("2025-01-01")` to convert it to a date format. 
 
   3. `index` is an $n$-length vector of the numeric summary value of the result. It might be a percent or proportion responding in a single category, (e.g., the "approve" response in presidential approval) or some multi-response summary, for example,
 
@@ -55,48 +54,82 @@ The first three arguments must be specified by the user, others are optional:
   
   Warning: The routine cannot determine the earliest or latest dates of items which not actually are used in the analysis. The criterion for usage is that items must appear in more than one period *after* aggregation. So if the beginning or ending dates are determined by an item which is discarded because it does not meet this criterion, the routine will fail.
 
-  8. `smoothing` specifies whether or not exponential smoothing is applied to intermediate esti- mates during the iterative solution process. Default is TRUE. 
+  8. `smoothing` specifies whether or not exponential smoothing is applied to intermediate estimates during the iterative solution process. Default is TRUE. 
   
-  9. `npass` not yet implemented
+  9. `npass` number of dimensions to be extracted can be 1 or 2, defaults to 1. 
 
 
 
 ##	Dating Considerations
 
-The routine expects a date variable of R class "date." This is how date will appear if it has been transferred from one of the database, spreadsheet, or statistical package formats recognized by the "foreign" library.
+The routine expects a date variable of R class `date`. Generally, import packages like `foreign`, `readr`, `haven`, `rio` will try to turn date-looking variables into date objects.  The `str()` function will identify if your variable is a date or character.  We can see from the output below that the `date` variable in the `jennings` dataset is indeed in a `date` format. 
 
-In the case of data entered from text sources, all is not so easy. The key is that a numeric representation of dates is needed, such as separate variables for month, day, and year. From these or fewer, depending on the unit specification, a date variable can be created as follows.
-
-Assume numeric values for 3 variables, named `month`, `day`, and `year`. Then: 
-
-```{r, eval=FALSE}
-date<-ISOdate(year,month,day)
+```{r}
+library(DyadRatios)
+data(jennings)
+str(jennings$date)
 ```
 
-will create the desired result. A further step is required to coerce the class of the date variable to "date."
+If your variable is not already in a date format, you can transform it as such with the functions from the `lubridate` package.  For example, if your date variable is in the format "2025-01-01", you can use the `ymd()` function to convert it to a date format as follows:
 
-```{r, eval=FALSE}
-date<-as.Date(date)
+```{r}
+library(lubridate)
+temp <- data.frame(survey_date = c("2025-01-01", "2024-10-13", "2020-05-13"))
+str(temp)
+temp$survey_date <- ymd(temp$survey_date)
+str(temp)
 ```
-Or, for "A" or "O" aggregation:
+See how the class changed from `chr` to `Date`.  
 
-```{r, eval=FALSE}
-date<-ISOdate(year,1,1) 
-date<-as.Date(date)
+If you happened to have three variables for month, day and year, you could paste them together and use the `lubridate` functions: 
+
+```{r}
+temp <- data.frame(year= c(2025, 2024, 2020), 
+                   month = c(1, 10, 5), 
+                   day = c(1, 13, 13))
+temp$date <- lubridate::ymd(paste(temp$year, temp$month, temp$day, sep="-"))
+str(temp)
 ```
 
-shows that constants can be used for unneeded date components.
 
-Warning: `ISOdate` will not handle fake dates (for example, 1-32-05). It decodes dates that actually existed on past calendars or will exist on future ones (e.g., no Feb 29 unless year is actually a leap year.)
+Warning: The `lubridate` functions will not handle fake dates (for example, 1-32-05). It decodes dates that actually existed on past calendars or will exist on future ones (e.g., no Feb 29 unless year is actually a leap year.)
 
-What you don’t want is a string representation, e.g., "January 1, 1993" because pulling out the pieces can be hideous. See R documentation for as.Date for conversion methods.
+Ideally, the dates will be in a structured format.  The lubridate functions will even parse string dates with words, e.g., "January 1, 1993" or "Aug 2, 2020" so long as the strings have month, day and year in the same position in the date.  
 
-Integer representation of dates from Excel or similar sources translate successfully with the foreign package, but would not be correct if input as integers in text form. Microsoft does not comply with the ISO standard. A Microsoft integer date, multiplied by 86400 (which is 24x60x60 for the number of seconds in a day) will produce an ISO date.
+```{r}
+temp <- data.frame(date = c("January 1, 1993", "Jan 1, 1993", "Aug 2, 2020"))
+temp$date <- mdy(temp$date)
+```
 
+The formats produced by importing excel or csv documents will not be identical to those produced by `lubridate` functions, but they will still work with the `extract()` function as their components can still be extracted by the `lubridate()` functions `month()`, `day()` and `year()`. 
+
+
+```{r}
+temp <- data.frame(date = ymd("2025-01-01", "1990-01-01", "1970-01-01", "1950-01-01"))
+xl_temp <- tempfile(fileext = ".xlsx")
+csv_temp <- tempfile(fileext = ".csv")
+
+rio::export(temp, xl_temp)
+rio::export(temp, csv_temp)
+
+
+temp_xl <- rio::import(xl_temp)
+temp_csv <- rio::import(csv_temp)
+
+str(temp_xl)
+str(temp_csv)
+
+```
+Notice that from excel, you get a `POSIXct` format variable and from csv you get an `IDate` object.  They still are equal in integer form to the `lubridate` way.  All values pass the equivalence test. 
+
+```{r}
+all(temp$date == temp_xl$date)
+all(temp$date == temp_csv$date)
+```
 
 ## Output
 
-The `extract` function produces as output 7 categories of information:
+The `extract` function produces as output 8 categories of information:
  
   1. `formula` reproduces the user call
   2. `setup` supplies basic information about options and the iterative solution
@@ -104,18 +137,21 @@ The `extract` function produces as output 7 categories of information:
   4. `varname` is a list in order of the variables actually used in the analysis, a subset of all those in the data.
   5. `loadings` are the item-scale correlations from the final solution. Their square is the validity estimate used in weighting.
   6. `means` and `std.deviations` document the item descriptive information, and
-  7. `latent1` is the estimated time series, the purpose of everything.
-
+  7. `latent` is the estimated time series, the purpose of everything. The variable `latent1` is for the first dimension and `latent2` for the second, if applicable. 
+  8. Diagnostic Information: there are several additional objects returned in the output, including `hist` - the iteration history, `totalvar` - the total variance to be explained, 
+  `var_exp` - the variance explained by each dimension, `dropped` - any series dropped from the analysis, and `smoothing` - whether smoothing was applied during the iterative solution process.
 
 ### Output Functions
 
-The raw output file created at run time contains everything of interest, but in an inconvenient format. Three output functions display the same information in a more logically coherent manner. Each is based on the output file and the R package extends the generic `plot` and `summary` methods and defines a new `display` method for objects of class of "extract".
+The raw output object created at run time contains everything of interest, but in an inconvenient format. There are several functions that can be used to display results in different ways. 
 
-  1. `plot` displays a time series plot of the number of dimensions estimated on y axes against time units on the x axis and can be called with `plot(object)`
-
-  2. `display` displays the latent series estimates by time unit, the format depending upon aggregation interval chosen. For monthly, it is "yyyy mm latent-estimate" for example.  The function can be called with `display(object, "myfilename")` which will write the latent estimates to a file named "myfilename" in the current working directory.  Omitting the file name will print the output to the console. 
+  1. `plot` displays a time series ggplot of the number of dimensions estimated on y axes against time units on the x axis and can be called with `plot(object)`
   
-  3. `summary` displays information about the raw series of the analysis. Under the heading: "Variable Name Cases Loading Mean Std Dev" it lists as many series as are used in the solution, giving variable name, number of cases (after aggregation), dimension loadings, and means and standard deviations of the raw series.  Similarly, this can be called with `summary(object, "myfilename")`, which will write the variable information to the file "myfilename".  Altneratively, omitting "myfilename" will print the summary results to the console. 
+  2. `print` displays the output of the iterative solution process.  This is what previously was printed with `verbose=TRUE` which has been removed in favor of a print method for the function output. 
+  
+  3. `summary` displays information about the raw series of the analysis. Under the heading: "Variable Name Cases Loading Mean Std Dev" it lists as many series as are used in the solution, giving variable name, number of cases (after aggregation), dimension loadings, and means and standard deviations of the raw series.  
+  
+  4. `get_mood` retrieves the period and latent dimension estimate(s) from the model object and returns them in a data frame. 
  
 ###	Negative Correlations?
 
@@ -140,7 +176,70 @@ But we do have missing x's - and in the typical case it is most of them. We woul
 
 As in iterated principal components we both make assumptions about item validity and then, post hoc, have the ability to observe empirical estimates of validities (the square of item/scale correlations). At the beginning validities are assumed to be 1.0 for all items. Then the empirically estimated validities become assumed validities for the next iteration. This procedure is repeated until the difference between assumed and estimated validities is effectively zero for all items, the maximum item discrepancy less than .001.
 
+## Example
+
+We illustrate the use of `extract` with the data from Jennings et. al. (2017) who graciously shared their data through dataverse.  The first few observations show the question names, dates, percentage distrusting in government, and sample size. 
+
+```{r}
+library(DyadRatios)
+data(jennings)
+head(jennings)
+```
+
+We could see how many questions there are in the data. 
+
+```{r}
+library(dplyr) 
+jennings %>% 
+  group_by(variable) %>% 
+  tally() %>% 
+  arrange(desc(n))
+```
+
+We can now estimate the dyad ratios algorithm: 
+
+```{r}
+jennings_out <- extract(
+  varname = jennings$variable, 
+  date = jennings$date, 
+  index = jennings$value, 
+  ncases = jennings$n, 
+  begindt = min(jennings$date), 
+  enddt = max(jennings$date), 
+  npass=1
+)
+
+```
+
+We can print the information about the estimates with: 
+
+```{r}
+print(jennings_out)
+```
+
+Our latent dimension explains about $50\%$ of the variance in the raw series.  We could also look at the loadings: 
+
+```{r}
+summary(jennings_out)
+```
+
+Some of these have much higher loadings than others.  That means, they are more reliable indicators of government (dis)trust than others.  For example, `govtrust_bsa` (actual question from the BSA: "Do not trust British governments to place needs of the nation above interests of their own party?") is a very reliable indicator with observations in 20 different time-periods.  On the other hand, `bse_MPs` (actual question from the BSA: "Those we elect as MPs lose touch with people pretty quickly") has a quite lower loading indicating it is a much less reliable indicator of (dis)trust.  We can also make a plot of mood: 
+
+```{r}
+plot(jennings_out)
+```
+
+Finally, to retrieve the latent dimension and the periods, we can use the `get_mood` function:
+
+```{r}
+ests <- get_mood(jennings_out)
+ests
+```
+
+
 
 ## References
 
-Stimson, James A. 2018. "The Dyad Ratios Algorithm for Estimating Latent Public Opinion: Estimation, Testing, and Comparison to Other Approaches." Bulletin of Methodological Sociology 137-138:201–218.
+Jennings, W. N. Clarke, J. Moss and G. Stoker  (2017). "The Decline in Diffuse Support for National Politics: The Long View on Political Discontent in Britain", Public Opinion Quarterly, 81(3), 748-758. \doi{10.1093/poq/nfx020}
+
+Stimson, James A. 2018. "The Dyad Ratios Algorithm for Estimating Latent Public Opinion: Estimation, Testing, and Comparison to Other Approaches." Bulletin of Methodological Sociology 137-138:201–218. \doi{doi:10.1177/0759106318761614}

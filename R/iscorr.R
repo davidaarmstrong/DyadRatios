@@ -1,3 +1,5 @@
+#' Create issue-scale correlation.  Low level function called by extract, not intended to be called by the user. 
+#' @noRd
 iscorr <-
 function(issue,mood) { #compute issue-scale correlations
   Nv<- length(issue[1,])
