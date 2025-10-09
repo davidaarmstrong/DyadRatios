@@ -86,6 +86,16 @@
 #' summary(dr_out)
 #' 
 extract <- function(varname,date,index,ncases=NULL,unit="A",mult=1,begindt=NA,enddt=NA,npass=1,smoothing=TRUE,endmonth=12) {
+  tmp <- data.frame(varname = varname, date = date, index = index, ncases = ncases)
+  sp_tmp <- split(tmp, tmp$varname)
+  for(i in seq_along(sp_tmp)) {
+    sp_tmp[[i]] <- sp_tmp[[i]][order(sp_tmp[[i]]$date), ]
+  }
+  tmp <- do.call(rbind, sp_tmp)
+  varname <- tmp$varname
+  index <- tmp$index
+  date <- tmp$date
+  ncases <- tmp$ncases
   formula<-match.call(extract)
   csign <- NULL
   nrecords<- length(varname)
