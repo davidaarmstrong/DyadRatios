@@ -45,15 +45,26 @@ Defaults to \code{TRUE}.}
 
 \item{parallel}{Logical indicating whether the `mclapply` function should be used.}
 
+\item{level}{The confidence level for the intervals. Default is 0.95.}
+
+\item{pw}{Logical indicating whether to do pairwise tests.}
+
 \item{...}{Other arguments to be passed down to `mclapply`.}
 }
 \value{
-A data frame with variables:
+A list with potentially two data frames `ci` has variables:
 \itemize{
   \item \code{period}: Aggregation period. 
   \item \code{latent1}: Estimate of latent variable from original analysis.
   \item \code{lwr}: Lower confidence bound.
   \item \code{upr}: Upper confidence bound. 
+}
+If `pw = TRUE`, the list also contains `pw` with variables:
+\itemize{
+  \item \code{p1}: Earlier period 
+  \item \code{p2}: Later period 
+  \item \code{diff}: (mood for p2) - (mood for p1)
+  \item \code{p_diff}: Probability that the larger mood is bigger than the smaller mood. 
 }
 }
 \description{

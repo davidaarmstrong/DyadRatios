@@ -237,6 +237,48 @@ ests
 ```
 
 
+## Bootstrapping 
+
+Dave Armstrong added this facet of the analytical framework.  
+
+There is no inferential framework baked-in to Stimson's original method. However, we can use a bootstrap to get a sense of the variability of the estimates.  I would argue that we should not do a simple non-parametric bootstrap because that will change the temporal density of the data.  Instead, we could use a parametric bootstrap.  This allows us to get a sense of how variable the estimates are given the data that we have.  The algorithm uses the following steps. 
+
+1. Sample the number of cases as $n^{(b)}_i \sim \text{Binomial}(\text{index}_i, \text{ncases}_i)$ for each observation in the model.  
+2. Calculate the boostrapped index value $\text{index}_i^{(b)} = \frac{n^{(b)}_i}{\text{ncases}_i}$. 
+3. Estimate mood using $\text{index}_{i}^{(b)}$ and the original number of cases. 
+4. Repeat steps 1-3 for $R$ bootstrap samples.
+5. Calculate the $\frac{1-\text{level}}{2}$ and $1-\frac{1-\text{level}}{2}$ quantiles of the bootstrap distribution.
+
+Here's the bootstrapped analysis for the Jennings data. 
+
+```{r}
+data(jennings)
+jennings_boot <- boot_dr(
+  varname = jennings$variable, 
+  date = jennings$date, 
+  index = jennings$value, 
+  ncases = jennings$n, 
+  begindt = min(jennings$date), 
+  enddt = max(jennings$date), 
+  npass=1, 
+  R=100, 
+  parallel=FALSE
+)
+head(jennings_boot$ci)
+```
+
+We could plot the bootstrapped results.
+
+```{r}
+library(ggplot2)
+ggplot(jennings_boot$ci, aes(x=period)) + 
+  geom_ribbon(aes(ymin=lwr, ymax=upr), alpha=0.2) + 
+  geom_line(aes(y=latent1)) + 
+  labs(y="Mood (Distrust in Government)", x="Year") + 
+  theme_bw()
+```
+
+
 
 ## References
 

@@ -68,6 +68,7 @@ A list with components:
   \item \code{var_exp}: Data frame with variance explained and proportion of variance explained for each dimension.
   \item \code{dropped}: Data frame listing any series that were dropped from the analysis due to insufficient data.
   \item \code{smoothing}: Logical indicating whether smoothing was applied during the iterative solution process.
+  \item \code{ms_list}: List of means and variances for standardizing the input series for the bootstrap. 
 }
 }
 \description{
