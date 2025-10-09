@@ -9,7 +9,7 @@
 \item{...}{Other arguments to be passed down (currently unused).}
 }
 \value{
-Printed output of variable loadings and descriptive information.
+A data frame with variables for the question name, number of cases, loading as well as mean and standard deviation of the series.
 }
 \description{
 Prints a summary from objects estimated with the the extract function.
