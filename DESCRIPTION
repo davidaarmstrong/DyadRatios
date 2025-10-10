@@ -10,6 +10,6 @@ Depends: R (>= 4.1.0)
 Imports: ggplot2, lubridate, progress, stats, utils
 License: GPL (>=2)
 Encoding: UTF-8
-Suggests: dplyr, rio, knitr, rmarkdown, parallel
+Suggests: dplyr, rio, knitr, rmarkdown, parallel, tidyr
 VignetteBuilder: knitr
 RoxygenNote: 7.3.2

@@ -166,7 +166,7 @@ The starting assumption is that ratios, $r_{it+k} = \frac{x_it+k}{x_{it}}$ of th
  
 $$\theta_{t} = \frac{\sum_{i=1}^{n}r_{it}}{n}$$
 
-But we do have missing x's - and in the typical case it is most of them. We would still be in good shape if we had a common period, say period 1, which was available for all series. We could then form the sum from the $k$ available items, $k\leqn$, and divide by $k$. But we also lack such a common period. That motivates a recursive approach.
+But we do have missing x's - and in the typical case it is most of them. We would still be in good shape if we had a common period, say period 1, which was available for all series. We could then form the sum from the $k$ available items, $k\leq n$, and divide by $k$. But we also lack such a common period. That motivates a recursive approach.
 
 **Forward Recursion**:	Begin by selecting that subset of items which are available at time 1. For them we can form $\hat{\theta}$ for $t=1,\ldots, T$ setting $\hat{\theta}_{1} = 1.0$ and calculating $\hat{\theta}_{2}, \ldots, \hat{\theta}_{T}$ from whatever subsets of items are available.  Now proceed to period 2, setting $\hat{\theta}_{2}$ to that value estimated from period 1 and now, using the subset of items which include period 2, estimating $\hat{\theta}_{3}, \ldots, \hat{\theta}_{T}$ from the assumption that  $\theta_{2} = \hat{\theta}_{2}$.  By projecting $\hat{\theta}_{2}$ forward in this manner,  the estimates for periods 3 through $T$ become comparable to what they would have been had period 1 information been available. This procedure is repeated one period at a time through $T-1$, giving from 1 to $T-1$ different estimates of each of the $\theta_{t}$. An average of all of them becomes $\hat{\theta}_{t}$.
 
@@ -193,24 +193,14 @@ library(dplyr)
 jennings %>% 
   group_by(variable) %>% 
   tally() %>% 
-  arrange(desc(n))
+  arrange(desc(n)) %>% 
+  print(n=40)
 ```
 
 We can now estimate the dyad ratios algorithm: 
 
 ```{r}
-jennings_out <- extract(
-  varname = jennings$variable, 
-  date = jennings$date, 
-  index = jennings$value, 
-  ncases = jennings$n, 
-  begindt = min(jennings$date), 
-  enddt = max(jennings$date), 
-  npass=1
-)
-
-
-jennings_out <- extract(
+jennings_out <- DyadRatios::extract(
   varname = jennings$variable, 
   date = jennings$date, 
   index = jennings$value, 
@@ -219,8 +209,6 @@ jennings_out <- extract(
   enddt = max(jennings$date), 
   npass=1
 )
-
-
 ```
 
 We can print the information about the estimates with: 
@@ -237,7 +225,7 @@ summary(jennings_out)
 
 Some of these have much higher loadings than others.  That means, they are more reliable indicators of government (dis)trust than others.  For example, `govtrust_bsa` (actual question from the BSA: "Do not trust British governments to place needs of the nation above interests of their own party?") is a very reliable indicator with observations in 20 different time-periods.  On the other hand, `bse_MPs` (actual question from the BSA: "Those we elect as MPs lose touch with people pretty quickly") has a quite lower loading indicating it is a much less reliable indicator of (dis)trust.  We can also make a plot of mood: 
 
-```{r}
+```{r out.width="75%", fig.align="center", fig.height=5, fig.width=8}
 plot(jennings_out)
 ```
 
@@ -253,11 +241,11 @@ ests
 
 Dave Armstrong added this facet of the analytical framework.  
 
-There is no inferential framework baked-in to Stimson's original method. However, we can use a bootstrap to get a sense of the variability of the estimates.  I would argue that we should not do a simple non-parametric bootstrap because that will change the temporal density of the data.  Instead, we could use a parametric bootstrap.  This allows us to get a sense of how variable the estimates are given the data that we have.  The algorithm uses the following steps. 
+There is no inferential framework baked-in to Stimson's original method.  In fact, in my conversations with Jim about this point, he seemed wholly uninterested in the sampling uncertainty of the measure.  Given that I think Jim has forgotten more about this stuff than I know, he may well have the right of it.  That said, I think it is interesting, so I decided to write a bootstrapping algorightm to get a sense of the variability of the estimates.  I would argue that we should not do a simple non-parametric bootstrap because that will change the temporal density of the data.  Instead, we could use a parametric bootstrap.  This allows us to get a sense of how variable the estimates are given the data that we have.  The algorithm uses the following steps. 
 
 1. Sample the number of cases as $n^{(b)}_i \sim \text{Binomial}(\text{index}_i, \text{ncases}_i)$ for each observation in the model.  
 2. Calculate the boostrapped index value $\text{index}_i^{(b)} = \frac{n^{(b)}_i}{\text{ncases}_i}$. 
-3. Estimate mood using $\text{index}_{i}^{(b)}$ and the original number of cases. 
+3. Estimate mood using $\text{index}_{i}^{(b)}$ and the original number of cases.  In this step, when the data are normalized (i.e., the weighted mean and standard deviation are calculated), we use the weighted mean and standard deviation from the original data so that differences in the mean and standard deviation are not responsible for the variation.
 4. Repeat steps 1-3 for $R$ bootstrap samples.
 5. Calculate the $\frac{1-\text{level}}{2}$ and $1-\frac{1-\text{level}}{2}$ quantiles of the bootstrap distribution.
 
@@ -273,15 +261,21 @@ jennings_boot <- boot_dr(
   begindt = lubridate::ymd("1985-01-01"), 
   enddt = max(jennings$date), 
   npass=1, 
-  R=100, 
-  parallel=FALSE
+  R=1000, 
+  parallel=FALSE, 
+  pw = TRUE
 )
+```
+
+The bootstrapped results (if `pw=TRUE`) contains two elements - `ci` and `pw`.  The `ci` element contains the estimate and confidence intervals for the latent dimension.  Here are the first few lines of the confidence intervals: 
+
+```{r}
 head(jennings_boot$ci)
 ```
 
-We could plot the bootstrapped results.
+The main use for this would be a plot like the following: 
 
-```{r}
+```{r out.width="75%", fig.align="center", fig.height=5, fig.width=8}
 library(ggplot2)
 ggplot(jennings_boot$ci, aes(x=period)) + 
   geom_ribbon(aes(ymin=lwr, ymax=upr), alpha=0.2) + 
@@ -289,6 +283,41 @@ ggplot(jennings_boot$ci, aes(x=period)) +
   labs(y="Mood (Distrust in Government)", x="Year") + 
   theme_bw()
 ```
+
+If `pw=TRUE`, the `pw` element contains pairwise comparisons between all time periods.  This would be most useful for identifying where "significant" changes in mood happen.  For example, you could look at the significant differences, we'll just look at the first few here: 
+
+```{r}
+jennings_boot$pw %>% 
+  filter(p_diff > .95) %>% 
+  head()
+```
+
+You could also make a plot of which differences are significant for all pairs. 
+
+```{r out.width="75%", fig.align="center", fig.height=8, fig.width=8}
+library(tidyr)
+pwdiff <- jennings_boot$pw %>% 
+  mutate(diff_sig = ifelse(p_diff > .95, diff, 0))
+
+ggplot(pwdiff, aes(x=as.factor(p1), y=as.factor(p2), fill=diff_sig)) + 
+  geom_tile(color="black") + 
+  scale_fill_gradient2(low="#377eb8", mid="white", high="#e41a1c", na.value = "grey90") +
+  labs(x="From", y="To", fill = "To - From") + 
+  theme_classic() + 
+  theme(axis.text.x = element_text(angle=90, vjust=0.5, hjust=1), 
+        legend.position = "inside", 
+        legend.position.inside = c(.85, .33))
+
+
+```
+In this instance, anywhere that is white indicates a non-significant difference.  We can see from the plot above that there are many year-over-year changes that are statistically significant.  We could print them out, arranged by size: 
+
+```{r}
+jennings_boot$pw %>% 
+  filter(p_diff > .95 & p2 - p1 == 1) %>% 
+  arrange(diff)
+```
+
 
 
 

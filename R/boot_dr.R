@@ -69,16 +69,17 @@
 #' @examples
 #' data(jennings)
 #' # R should be higher for real-world applications
+#' \dontrun{
 #' boot_out <- boot_dr(varname = jennings$variable, 
 #'                   date = jennings$date, 
 #'                   index = jennings$value, 
 #'                   ncases = jennings$n, 
-#'                   begindt = min(jennings$date), 
+#'                   begindt = as.Date("1985-01-01"), 
 #'                   enddt = max(jennings$date), 
-#'                   npass=1, R=50, parallel=FALSE)
+#'                   npass=1, R=1000, 
+#'                   parallel=FALSE)
 #' boot_out
-#' 
-
+#' }
 boot_dr <- function(varname,
                     date,
                     index,
