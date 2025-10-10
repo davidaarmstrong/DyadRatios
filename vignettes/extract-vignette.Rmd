@@ -209,6 +209,18 @@ jennings_out <- extract(
   npass=1
 )
 
+
+jennings_out <- extract(
+  varname = jennings$variable, 
+  date = jennings$date, 
+  index = jennings$value, 
+  ncases = jennings$n, 
+  begindt = lubridate::ymd("1985-01-01", tz="GMT"), 
+  enddt = max(jennings$date), 
+  npass=1
+)
+
+
 ```
 
 We can print the information about the estimates with: 
@@ -258,7 +270,7 @@ jennings_boot <- boot_dr(
   date = jennings$date, 
   index = jennings$value, 
   ncases = jennings$n, 
-  begindt = min(jennings$date), 
+  begindt = lubridate::ymd("1985-01-01"), 
   enddt = max(jennings$date), 
   npass=1, 
   R=100, 

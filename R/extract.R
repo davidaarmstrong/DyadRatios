@@ -32,6 +32,11 @@
 #'   Defaults to \code{TRUE}.
 #' @param endmonth Ending month of the analysis.
 #'
+#' @details In previous versions of the algorithm, especially in its original incarnation as `Wcalc.exe`, getting the dates right was really important.  They needed to be in precisely the right format and the
+#' data needed to be ordered by date.  In this version of the `extract()` function, any R date class is fine whether it is a `Date` class or `POSIX*` class.  The function uses `is.Date` from the 
+#' `lubridate` package to check if it is a `Date` class and `as.Date()` from R's `base` package to coerce it to a `Date` class if it is not.  Further, the series are ordered by date in the function 
+#' as a matter of course, so it is not necessary that they be in ascending ordered of date in the input data. 
+#'
 #' @return A list with components:
 #' \itemize{
 #'   \item \code{call}: The initial call to `extract()`. 
@@ -70,7 +75,7 @@
 #'
 #' @importFrom stats cor lm optim sd var
 #' @importFrom graphics legend lines par plot 
-#' @importFrom lubridate ymd year month day quarter
+#' @importFrom lubridate ymd year month day quarter is.Date
 #' 
 #' @usage NULL
 #' @export
@@ -87,6 +92,7 @@
 #' summary(dr_out)
 #' 
 extract <- function(varname,date,index,ncases=NULL,unit="A",mult=1,begindt=NA,enddt=NA,npass=1,smoothing=TRUE,endmonth=12) {
+  if(!is.Date(date))date <- as.Date(date)
   tmp <- data.frame(varname = varname, date = date, index = index, ncases = ncases)
   sp_tmp <- split(tmp, tmp$varname)
   for(i in seq_along(sp_tmp)) {
@@ -106,7 +112,7 @@ extract <- function(varname,date,index,ncases=NULL,unit="A",mult=1,begindt=NA,en
     for (i in 1:nrecords) { #first loop through raw data file
       month<- month(moddate[i])
       year<- year(moddate[i])
-      if (month>endmonth) moddate[i]<- ymd(paste(year, "01", "01", sep="-"), tz="GMT") #modified date become 1/1 of next year
+      if (month>endmonth) moddate[i]<- ymd(paste(year, "01", "01", sep="-")) #modified date become 1/1 of next year
     } #end loop through data
   } # end if
 
@@ -116,6 +122,21 @@ extract <- function(varname,date,index,ncases=NULL,unit="A",mult=1,begindt=NA,en
   if (is.na(enddt)) maxper<-month(max(moddate)) else maxper<-month(enddt)
   if (is.na(enddt)) maxy<-year(max(moddate)) else maxy<-year(enddt)
   if (is.na(enddt)) maxday<-day(max(moddate)) else maxday<-day(enddt)
+  mindate <- lubridate::ymd(paste(miny, minper, minday, sep="-"))
+  maxdate <- lubridate::ymd(paste(maxy, maxper, maxday, sep="-"))
+
+  w <- which(moddate >= mindate & moddate <=maxdate)
+  if(length(w) == 0){
+    stop("No surveys within date range. \n")
+  }
+  varname <- varname[w]
+  index <- index[w]
+  if(!is.null(ncases)){
+    ncases <- ncases[w]
+  }
+  moddate <- moddate[w]
+  date <- date[w]
+  
   if (unit=="Q") {
     minper<- as.integer((minper-1)/3)+1
     maxper<- as.integer((maxper-1)/3)+1
@@ -123,8 +144,6 @@ extract <- function(varname,date,index,ncases=NULL,unit="A",mult=1,begindt=NA,en
   # mindate<- ISOdate(miny,minper,minday,0,0,0,tz="GMT")
   # maxdate<- ISOdate(maxy, maxper, maxday,0,0,0,tz="GMT") #86400=24*60*60
 
-  mindate <- lubridate::ymd(paste(miny, minper, minday, sep="-"), tz="GMT")
-  maxdate <- lubridate::ymd(paste(maxy, maxper, maxday, sep="-"), tz="GMT")
   
   
   #SETCONS:
@@ -495,6 +514,7 @@ extract <- function(varname,date,index,ncases=NULL,unit="A",mult=1,begindt=NA,en
 #' Extract for bootstrap includes arguments for means and standard deviations for standardizing
 #' @noRd
 extract_bs <- function(varname,date,index,ncases=NULL,unit="A",mult=1,begindt=NA,enddt=NA,npass=1,smoothing=TRUE,endmonth=12, wm, ws) {
+  if(!is.Date(date))date <- as.Date(date)
   tmp <- data.frame(varname = varname, date = date, index = index, ncases = ncases)
   sp_tmp <- split(tmp, tmp$varname)
   for(i in seq_along(sp_tmp)) {
@@ -514,7 +534,7 @@ extract_bs <- function(varname,date,index,ncases=NULL,unit="A",mult=1,begindt=NA
     for (i in 1:nrecords) { #first loop through raw data file
       month<- month(moddate[i])
       year<- year(moddate[i])
-      if (month>endmonth) moddate[i]<- ymd(paste(year, "01", "01", sep="-"), tz="GMT") #modified date become 1/1 of next year
+      if (month>endmonth) moddate[i]<- ymd(paste(year, "01", "01", sep="-")) #modified date become 1/1 of next year
     } #end loop through data
   } # end if
   
@@ -531,8 +551,8 @@ extract_bs <- function(varname,date,index,ncases=NULL,unit="A",mult=1,begindt=NA
   # mindate<- ISOdate(miny,minper,minday,0,0,0,tz="GMT")
   # maxdate<- ISOdate(maxy, maxper, maxday,0,0,0,tz="GMT") #86400=24*60*60
   
-  mindate <- lubridate::ymd(paste(miny, minper, minday, sep="-"), tz="GMT")
-  maxdate <- lubridate::ymd(paste(maxy, maxper, maxday, sep="-"), tz="GMT")
+  mindate <- lubridate::ymd(paste(miny, minper, minday, sep="-"))
+  maxdate <- lubridate::ymd(paste(maxy, maxper, maxday, sep="-"))
   
   
   #SETCONS:

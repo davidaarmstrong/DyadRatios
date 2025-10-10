@@ -75,6 +75,12 @@ A list with components:
 Estimates the Dyad Ratios Algorithm for constructing latent time series from
 survey-research marginals.
 }
+\details{
+In previous versions of the algorithm, especially in its original incarnation as `Wcalc.exe`, getting the dates right was really important.  They needed to be in precisely the right format and the
+data needed to be ordered by date.  In this version of the `extract()` function, any R date class is fine whether it is a `Date` class or `POSIX*` class.  The function uses `is.Date` from the 
+`lubridate` package to check if it is a `Date` class and `as.Date()` from R's `base` package to coerce it to a `Date` class if it is not.  Further, the series are ordered by date in the function 
+as a matter of course, so it is not necessary that they be in ascending ordered of date in the input data.
+}
 \examples{
 data(jennings)
 dr_out <- extract(varname = jennings$variable, 
