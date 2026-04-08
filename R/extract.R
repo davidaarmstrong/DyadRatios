@@ -104,7 +104,6 @@ extract <- function(varname,date,index,ncases=NULL,unit="A",mult=1,begindt=NA,en
   date <- tmp$date
   ncases <- tmp$ncases
   formula<-match.call(extract)
-  csign <- NULL
   nrecords<- length(varname)
   if (is.null(ncases)) ncases<- rep(0,nrecords)
   moddate <- date #create temporary date vector, leaving original unmodified
@@ -203,10 +202,9 @@ extract <- function(varname,date,index,ncases=NULL,unit="A",mult=1,begindt=NA,en
   vfac<- factor(varname) #make a factor vector
   vlev<- levels(vfac)    #find unique categories
   nvar<- length(vlev)    #how many are there?, includes unusable series
-  valid<- numeric(nvar)
-  csign<- numeric(nvar)
-  assign("csign", numeric(nvar), envir=parent.frame())
-  vl<- character(nvar)
+  valid <- numeric(nvar)
+  csign <- numeric(nvar)
+  vl <- character(nvar)
   r<- numeric(nvar)
   oldr<- rep(1,nvar) # r=1 for all v initially
 
@@ -317,9 +315,8 @@ extract <- function(varname,date,index,ncases=NULL,unit="A",mult=1,begindt=NA,en
     for (p in 1:nperiods) {
       count[p]<- sum(!is.na(issue[p,]))
     }
-    valid<- rep(1,times=nvar)
-    csign<- rep(1,times=nvar)
-    assign("csign", rep(1,times=nvar), envir=parent.frame())
+    valid <- rep(1, times = nvar)
+    csign <- rep(1, times = nvar)
     auto <- "y"              #iterative estimation on by default
     quit <- 0                #false implies go ahead and estimate
 
@@ -353,9 +350,9 @@ extract <- function(varname,date,index,ncases=NULL,unit="A",mult=1,begindt=NA,en
     evalue<- 0
     totalvar<- 0
 
-    assign("csign", ifelse(is.na(sign(r)), csign, sign(r)), envir=parent.frame())
     for (v in 1:nvar) {
       wn<- nperiods-sum(is.na(issue[,v]))
+      if (!is.na(sign(r[v]))) csign[v]<- sign(r[v])
       #if (!is.na(sign(r[v]))) csign[v]<<- sign(r[v])
       wn<- nperiods-sum(is.na(issue[,v]))
       if (wn>1) { #sum over variables actually used
@@ -614,7 +611,6 @@ extract_bs <- function(varname,date,index,ncases=NULL,unit="A",mult=1,begindt=NA
   nvar<- length(vlev)    #how many are there?, includes unusable series
   valid<- numeric(nvar)
   csign<- numeric(nvar)
-  assign("csign", numeric(nvar), envir=parent.frame())
   vl<- character(nvar)
   r<- numeric(nvar)
   oldr<- rep(1,nvar) # r=1 for all v initially
@@ -728,7 +724,6 @@ extract_bs <- function(varname,date,index,ncases=NULL,unit="A",mult=1,begindt=NA
     }
     valid<- rep(1,times=nvar)
     csign<- rep(1,times=nvar)
-    assign("csign", rep(1,times=nvar), envir=parent.frame())
     auto <- "y"              #iterative estimation on by default
     quit <- 0                #false implies go ahead and estimate
     
@@ -762,10 +757,9 @@ extract_bs <- function(varname,date,index,ncases=NULL,unit="A",mult=1,begindt=NA
       evalue<- 0
       totalvar<- 0
       
-      assign("csign", ifelse(is.na(sign(r)), csign, sign(r)), envir=parent.frame())
       for (v in 1:nvar) {
         wn<- nperiods-sum(is.na(issue[,v]))
-        #if (!is.na(sign(r[v]))) csign[v]<<- sign(r[v])
+        if (!is.na(sign(r[v]))) csign[v]<- sign(r[v])
         wn<- nperiods-sum(is.na(issue[,v]))
         if (wn>1) { #sum over variables actually used
           vratio <- wn / nperiods
