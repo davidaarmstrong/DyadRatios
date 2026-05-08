@@ -26,20 +26,22 @@
 #' @param parallel  Logical. Parallelise the outer loop using \pkg{parallel} if
 #'   available? Useful for large \code{R}. Default \code{FALSE}.
 #'
-#' @return A list of class \code{"boot_dr"} with two components:
+#' @return A list of class \code{"boot_dr"} with two or four components
+#'   depending on whether the original \code{obj} used one or two dimensions:
 #'   \describe{
 #'     \item{\code{estimates}}{A \code{data.frame} with one row per time period
 #'       and columns \code{period}, \code{year}, \code{month}, \code{quarter},
-#'       \code{mood} (original point estimate), \code{lower} (lower confidence
-#'       bound at \code{(1 - level) / 2}), and \code{upper} (upper confidence
-#'       bound at \code{1 - (1 - level) / 2}).}
-#'     \item{\code{samples}}{A numeric matrix of dimension
-#'       \code{n_periods} × \code{R} containing the raw bootstrap mood
-#'       trajectories.  Each column is one replication; rows correspond to
-#'       time periods in \code{estimates}.}
+#'       \code{mood} (original point estimate), \code{lower}, and \code{upper}
+#'       (confidence bounds at \code{(1-level)/2} and \code{1-(1-level)/2}).
+#'       When \code{n_dim = 2}, three additional columns are appended:
+#'       \code{mood_dim2}, \code{lower_dim2}, and \code{upper_dim2}.}
+#'     \item{\code{samples}}{An \code{n_periods} × \code{R} matrix of raw
+#'       bootstrap dimension-1 trajectories.}
+#'     \item{\code{samples_dim2}}{(\code{n_dim = 2} only) An \code{n_periods}
+#'       × \code{R} matrix of raw bootstrap dimension-2 trajectories.}
 #'   }
 #'   The list also carries attributes \code{R} (number of successful
-#'   replications), \code{level}, and \code{agg_interval}.
+#'   replications), \code{level}, \code{agg_interval}, and \code{n_dim}.
 #'
 #' @details
 #' Each replication draws \eqn{y_i \sim \text{Binomial}(n_i, p_i)} where
@@ -90,7 +92,7 @@
 #' @export
 boot_dr <- function(obj, data, R = 200L,
                     level = 0.95,
-                    pw = FALSE, 
+                    pw = FALSE,
                     seed = NULL, parallel = FALSE) {
 
   stopifnot(inherits(obj, "extract"))
@@ -98,10 +100,11 @@ boot_dr <- function(obj, data, R = 200L,
   stopifnot(level > 0, level < 1)
   if (!is.null(seed)) set.seed(seed)
 
-  # ---- recover column names from the stored call ----------------------------
+  # ---- recover column names and settings from the stored call ---------------
   call_list <- as.list(obj$call)
   index_col <- if (!is.null(call_list$index_col)) as.character(call_list$index_col) else "index"
   n_col     <- if (!is.null(call_list$n_col))     as.character(call_list$n_col)     else NULL
+  n_dim     <- obj$settings$n_dim   # 1 or 2
 
   if (!index_col %in% names(data))
     stop("Column '", index_col, "' not found in data.")
@@ -131,10 +134,12 @@ boot_dr <- function(obj, data, R = 200L,
     the_args       <- boot_args
     the_args$data  <- d
 
-    tryCatch(
-      do.call(extract, the_args)$mood,
-      error = function(e) NULL
-    )
+    res <- tryCatch(do.call(extract, the_args), error = function(e) NULL)
+    if (is.null(res)) return(NULL)
+    if (n_dim == 2L)
+      list(mood = res$mood, mood_dim2 = res$mood_dim2)
+    else
+      res$mood
   }
 
   # ---- run replications -----------------------------------------------------
@@ -143,7 +148,7 @@ boot_dr <- function(obj, data, R = 200L,
     cl <- parallel::makeCluster(nc)
     on.exit(parallel::stopCluster(cl), add = TRUE)
     parallel::clusterExport(cl,
-      c("data", "prop", "ns", "index_col", "pct_scale", "boot_args"),
+      c("data", "prop", "ns", "index_col", "pct_scale", "boot_args", "n_dim"),
       envir = environment())
     parallel::clusterEvalQ(cl, library(DyadRatios))
     results <- parallel::parLapply(cl, seq_len(R), one_rep)
@@ -155,10 +160,16 @@ boot_dr <- function(obj, data, R = 200L,
   results <- results[ok]
   if (length(results) == 0L) stop("All bootstrap replications failed.")
 
-  mood_mat <- do.call(cbind, results)
+  # ---- build sample matrices ------------------------------------------------
+  alpha <- (1 - level) / 2
+  if (n_dim == 2L) {
+    mood_mat      <- do.call(cbind, lapply(results, `[[`, "mood"))
+    mood_mat_dim2 <- do.call(cbind, lapply(results, `[[`, "mood_dim2"))
+  } else {
+    mood_mat <- do.call(cbind, results)
+  }
 
   # ---- assemble summary data frame ------------------------------------------
-  alpha <- (1 - level) / 2
   estimates <- cbind(
     obj$periods,
     data.frame(
@@ -168,30 +179,39 @@ boot_dr <- function(obj, data, R = 200L,
       stringsAsFactors = FALSE
     )
   )
-  # ---- assemble return list -------------------------------------------------
-  out <- list(
-    estimates = estimates,
-    samples   = mood_mat
-  )
-  # ---- calculate optional pairwise differences ------------------------------
-  if(pw){
-    period <- estimates$period
-    combs <- combn(nrow(mood_mat), 2)
-    D <- matrix(0, nrow=nrow(mood_mat), ncol=ncol(combs))
-    D[cbind(combs[1,], 1:ncol(combs))] <- -1
-    D[cbind(combs[2,], 1:ncol(combs))] <- 1
-    diffs <- t(mood_mat) %*% D
-    p_diff <- apply(diffs, 2, \(x)mean(x > 0))
-    p_diff <- ifelse(p_diff < .5, 1-p_diff, p_diff)
-    diff = matrix(estimates$mood, nrow=1) %*% D
-    res_pw <- data.frame(p1 = period[combs[1,]], p2 = period[combs[2,]], diff = c(diff), p_diff = p_diff)
-    out$pw <- res_pw  
+  if (n_dim == 2L) {
+    estimates$mood_dim2  <- obj$mood_dim2
+    estimates$lower_dim2 <- apply(mood_mat_dim2, 1, quantile, probs = alpha,     na.rm = TRUE)
+    estimates$upper_dim2 <- apply(mood_mat_dim2, 1, quantile, probs = 1 - alpha, na.rm = TRUE)
   }
 
-  
+  # ---- assemble return list -------------------------------------------------
+  out <- list(estimates = estimates, samples = mood_mat)
+  if (n_dim == 2L) out$samples_dim2 <- mood_mat_dim2
+
+  # ---- calculate optional pairwise differences ------------------------------
+  if (pw) {
+    period <- estimates$period
+    combs  <- combn(nrow(mood_mat), 2)
+    D      <- matrix(0, nrow = nrow(mood_mat), ncol = ncol(combs))
+    D[cbind(combs[1, ], seq_len(ncol(combs)))] <- -1
+    D[cbind(combs[2, ], seq_len(ncol(combs)))] <-  1
+    diffs  <- t(mood_mat) %*% D
+    p_diff <- apply(diffs, 2, function(x) mean(x > 0))
+    p_diff <- ifelse(p_diff < 0.5, 1 - p_diff, p_diff)
+    diff   <- matrix(estimates$mood, nrow = 1) %*% D
+    out$pw <- data.frame(
+      p1     = period[combs[1, ]],
+      p2     = period[combs[2, ]],
+      diff   = c(diff),
+      p_diff = p_diff
+    )
+  }
+
   attr(out, "R")            <- sum(ok)
   attr(out, "level")        <- level
   attr(out, "agg_interval") <- obj$settings$agg_interval
+  attr(out, "n_dim")        <- n_dim
   class(out) <- "boot_dr"
   out
 }
@@ -204,33 +224,53 @@ boot_dr <- function(obj, data, R = 200L,
 #' unavailable.
 #'
 #' @param x     A \code{boot_dr} object returned by \code{\link{boot_dr}}.
+#' @param dim   Integer.  Which dimension to plot (\code{1} or \code{2}).
+#'   Dimension 2 is only available when the original \code{\link{extract}}
+#'   call used \code{n_dim = 2}.  Default \code{1}.
 #' @param title Character. Plot title.
 #' @param ylab  Character. Y-axis label.
 #' @param ...   Ignored.
 #' @return Invisibly, the ggplot2 object or \code{NULL} (base R).
 #' @importFrom graphics polygon lines
-#' @importFrom grDevices adjustcolor 
+#' @importFrom grDevices adjustcolor
 #' @export
 #' @method plot boot_dr
-plot.boot_dr <- function(x, title = "Estimated Public Mood",
+plot.boot_dr <- function(x, dim = 1L,
+                         title = "Estimated Public Mood",
                          ylab = "Mood", ...) {
   est <- x$estimates
+  n_dim_boot <- attr(x, "n_dim")
+
+  if (dim == 2L) {
+    if (is.null(n_dim_boot) || n_dim_boot < 2L ||
+        !all(c("mood_dim2", "lower_dim2", "upper_dim2") %in% names(est)))
+      stop("Dimension 2 results are not available in this boot_dr object.")
+    mood_col  <- "mood_dim2"
+    lower_col <- "lower_dim2"
+    upper_col <- "upper_dim2"
+  } else {
+    mood_col  <- "mood"
+    lower_col <- "lower"
+    upper_col <- "upper"
+  }
+
   date_vec <- as.Date(paste(est$year,
                             ifelse(est$month > 0, est$month, 1),
                             "01", sep = "-"))
 
   if (requireNamespace("ggplot2", quietly = TRUE)) {
     df <- data.frame(date  = date_vec,
-                     mood  = est$mood,
-                     lower = est$lower,
-                     upper = est$upper)
+                     mood  = est[[mood_col]],
+                     lower = est[[lower_col]],
+                     upper = est[[upper_col]])
     level_pct <- round(attr(x, "level") * 100)
+    dim_label <- if (dim == 2L) "  (dimension 2)" else ""
     p <- ggplot2::ggplot(df, ggplot2::aes(x = date)) +
       ggplot2::geom_ribbon(ggplot2::aes(ymin = lower, ymax = upper),
                            fill = "#2c7bb6", alpha = 0.2) +
       ggplot2::geom_line(ggplot2::aes(y = mood),
                          colour = "#2c7bb6", linewidth = 0.8) +
-      ggplot2::labs(title    = title,
+      ggplot2::labs(title    = paste0(title, dim_label),
                     subtitle = sprintf("%d%% bootstrap confidence interval  (R = %d)",
                                        level_pct, attr(x, "R")),
                     x = "Year", y = ylab) +
@@ -241,13 +281,13 @@ plot.boot_dr <- function(x, title = "Estimated Public Mood",
   }
 
   # Base R fallback
-  plot(date_vec, est$mood, type = "l", col = "#2c7bb6",
-       ylim = range(c(est$lower, est$upper), na.rm = TRUE),
+  plot(date_vec, est[[mood_col]], type = "l", col = "#2c7bb6",
+       ylim = range(c(est[[lower_col]], est[[upper_col]]), na.rm = TRUE),
        main = title, xlab = "Year", ylab = ylab, ...)
   polygon(c(date_vec, rev(date_vec)),
-          c(est$lower,  rev(est$upper)),
+          c(est[[lower_col]], rev(est[[upper_col]])),
           col = adjustcolor("#2c7bb6", alpha.f = 0.2), border = NA)
-  lines(date_vec, est$mood, col = "#2c7bb6")
+  lines(date_vec, est[[mood_col]], col = "#2c7bb6")
   invisible(NULL)
 }
 

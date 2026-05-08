@@ -174,3 +174,61 @@ test_that("plot.boot_dr runs without error", {
   boot <- boot_dr(res, dat, R = 20, seed = 6)
   expect_no_error(plot(boot))
 })
+
+# ============================================================================
+# boot_dr two-dimension tests
+# ============================================================================
+
+test_that("boot_dr n_dim=2 returns samples_dim2 matrix", {
+  dat  <- make_synthetic_data(n_items = 5, n_years = 25)
+  res  <- extract(dat, n_col = "n", n_dim = 2, smoothing = FALSE)
+  boot <- boot_dr(res, dat, R = 20, seed = 7)
+  expect_true("samples_dim2" %in% names(boot))
+  expect_true(is.matrix(boot$samples_dim2))
+  expect_equal(nrow(boot$samples_dim2), res$n_periods)
+  expect_equal(ncol(boot$samples_dim2), attr(boot, "R"))
+})
+
+test_that("boot_dr n_dim=2 estimates has dim2 CI columns", {
+  dat  <- make_synthetic_data(n_items = 5, n_years = 25)
+  res  <- extract(dat, n_col = "n", n_dim = 2, smoothing = FALSE)
+  boot <- boot_dr(res, dat, R = 20, seed = 8)
+  expect_true(all(c("mood_dim2", "lower_dim2", "upper_dim2") %in% names(boot$estimates)))
+  expect_false(anyNA(boot$estimates$mood_dim2))
+})
+
+test_that("boot_dr n_dim=2 mood_dim2 matches original extract", {
+  dat  <- make_synthetic_data(n_items = 5, n_years = 25)
+  res  <- extract(dat, n_col = "n", n_dim = 2, smoothing = FALSE)
+  boot <- boot_dr(res, dat, R = 20, seed = 9)
+  expect_equal(boot$estimates$mood_dim2, res$mood_dim2)
+})
+
+test_that("boot_dr n_dim=2 dim2 CI bounds bracket point estimate", {
+  dat  <- make_synthetic_data(n_items = 5, n_years = 25)
+  res  <- extract(dat, n_col = "n", n_dim = 2, smoothing = FALSE)
+  boot <- boot_dr(res, dat, R = 50, seed = 10)
+  expect_true(all(boot$estimates$lower_dim2 <= boot$estimates$mood_dim2 + 1e-9))
+  expect_true(all(boot$estimates$upper_dim2 >= boot$estimates$mood_dim2 - 1e-9))
+})
+
+test_that("boot_dr n_dim=2 n_dim attribute is 2", {
+  dat  <- make_synthetic_data(n_items = 5, n_years = 25)
+  res  <- extract(dat, n_col = "n", n_dim = 2, smoothing = FALSE)
+  boot <- boot_dr(res, dat, R = 20, seed = 11)
+  expect_equal(attr(boot, "n_dim"), 2L)
+})
+
+test_that("plot.boot_dr dim=2 runs without error", {
+  dat  <- make_synthetic_data(n_items = 5, n_years = 25)
+  res  <- extract(dat, n_col = "n", n_dim = 2, smoothing = FALSE)
+  boot <- boot_dr(res, dat, R = 20, seed = 12)
+  expect_no_error(plot(boot, dim = 2))
+})
+
+test_that("plot.boot_dr dim=2 errors on 1-dim object", {
+  dat  <- make_synthetic_data()
+  res  <- extract(dat, n_col = "n", smoothing = FALSE)
+  boot <- boot_dr(res, dat, R = 20, seed = 13)
+  expect_error(plot(boot, dim = 2))
+})

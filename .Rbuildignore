@@ -2,3 +2,5 @@
 ^\.Rproj\.user$
 README.md
 .*\.history$
+src/*.so
+src/*.o
