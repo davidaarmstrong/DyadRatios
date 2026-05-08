@@ -4,10 +4,14 @@
 \alias{plot.boot_dr}
 \title{Plot a boot_dr object}
 \usage{
-\method{plot}{boot_dr}(x, title = "Estimated Public Mood", ylab = "Mood", ...)
+\method{plot}{boot_dr}(x, dim = 1L, title = "Estimated Public Mood", ylab = "Mood", ...)
 }
 \arguments{
 \item{x}{A \code{boot_dr} object returned by \code{\link{boot_dr}}.}
+
+\item{dim}{Integer.  Which dimension to plot (\code{1} or \code{2}).
+Dimension 2 is only available when the original \code{\link{extract}}
+call used \code{n_dim = 2}.  Default \code{1}.}
 
 \item{title}{Character. Plot title.}
 

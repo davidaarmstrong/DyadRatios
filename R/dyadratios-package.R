@@ -4,7 +4,7 @@
 #' Implements the Dyad Ratios algorithm (Stimson 1991) for estimating latent
 #' public mood from a collection of time-series survey marginals.  The
 #' computationally intensive estimation loop is written in C++ (via Rcpp) and
-#' is a faithful translation of James Stimson's original MCalc program.  The R
+#' is a faithful translation of James Stimson's original 'MCalc' program.  The R
 #' layer handles data ingestion, temporal aggregation, result formatting, and
 #' visualisation.
 #'

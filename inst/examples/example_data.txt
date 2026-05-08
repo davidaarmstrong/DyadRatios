@@ -1,4 +1,4 @@
-# Synthetic example data in MCalc text format
+# Synthetic example data in 'MCalc' text format
 # Columns: varname  date(mm/dd/yyyy)  index  ncases
 # Three opinion items over 1980-2010 (annual)
 abortion   01/01/1980   52.1   1200

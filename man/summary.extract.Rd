@@ -16,6 +16,6 @@ Invisibly returns \code{object}.
 }
 \description{
 Prints a detailed report similar to the log file produced by the original
-MCalc program, including the iteration history, variable loadings, and
+'MCalc' program, including the iteration history, variable loadings, and
 variance accounting.
 }

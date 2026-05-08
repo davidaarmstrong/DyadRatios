@@ -37,20 +37,22 @@ the bootstrap loop. Default \code{NULL}.}
 available? Useful for large \code{R}. Default \code{FALSE}.}
 }
 \value{
-A list of class \code{"boot_dr"} with two components:
+A list of class \code{"boot_dr"} with two or four components
+  depending on whether the original \code{obj} used one or two dimensions:
   \describe{
     \item{\code{estimates}}{A \code{data.frame} with one row per time period
       and columns \code{period}, \code{year}, \code{month}, \code{quarter},
-      \code{mood} (original point estimate), \code{lower} (lower confidence
-      bound at \code{(1 - level) / 2}), and \code{upper} (upper confidence
-      bound at \code{1 - (1 - level) / 2}).}
-    \item{\code{samples}}{A numeric matrix of dimension
-      \code{n_periods} × \code{R} containing the raw bootstrap mood
-      trajectories.  Each column is one replication; rows correspond to
-      time periods in \code{estimates}.}
+      \code{mood} (original point estimate), \code{lower}, and \code{upper}
+      (confidence bounds at \code{(1-level)/2} and \code{1-(1-level)/2}).
+      When \code{n_dim = 2}, three additional columns are appended:
+      \code{mood_dim2}, \code{lower_dim2}, and \code{upper_dim2}.}
+    \item{\code{samples}}{An \code{n_periods} × \code{R} matrix of raw
+      bootstrap dimension-1 trajectories.}
+    \item{\code{samples_dim2}}{(\code{n_dim = 2} only) An \code{n_periods}
+      × \code{R} matrix of raw bootstrap dimension-2 trajectories.}
   }
   The list also carries attributes \code{R} (number of successful
-  replications), \code{level}, and \code{agg_interval}.
+  replications), \code{level}, \code{agg_interval}, and \code{n_dim}.
 }
 \description{
 Generates a sampling distribution around the latent mood trajectory by

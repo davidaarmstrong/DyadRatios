@@ -343,7 +343,7 @@ print.extract <- function(x, ...) {
 #' Summary method for extract objects
 #'
 #' Prints a detailed report similar to the log file produced by the original
-#' MCalc program, including the iteration history, variable loadings, and
+#' 'MCalc' program, including the iteration history, variable loadings, and
 #' variance accounting.
 #'
 #' @param object A \code{extract} object.

@@ -1,6 +1,6 @@
 // dyadratios_core.cpp
 // R/C++ interface for the Dyad Ratios algorithm.
-// Adapted from MCalc by James Stimson (UNC), originally in main.cpp / MCalc.h.
+// Adapted from 'MCalc' by James Stimson (UNC), originally in main.cpp / MCalc.h.
 // The interactive I/O and file reading of the original have been replaced by
 // R-level wrappers; all estimation logic is preserved faithfully.
 

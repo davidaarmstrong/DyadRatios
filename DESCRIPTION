@@ -13,8 +13,8 @@ Description: Implements the Dyad Ratios algorithm for estimating latent
     series. Supports annual, quarterly, monthly, and daily aggregation
     intervals, optional exponential smoothing, and up to two latent
     dimensions. Input data can be provided as a data frame or read from
-    delimited text files. Based on the MCalc C++ program by James Stimson
-    (University of North Carolina).
+    delimited text files. Based on Stimson's 'MCalc' C++ program. 
+    See Stimson (2018) <doi:10.1177/0759106318761614> for more details. 
 License: GPL-3
 Encoding: UTF-8
 Depends: R (>= 4.1.0)
