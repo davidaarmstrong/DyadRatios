@@ -2,15 +2,39 @@
 % Please edit documentation in R/get_mood.R
 \name{get_mood}
 \alias{get_mood}
-\title{Get Mood Estimates from Dyad Ratios Algorithm}
+\title{Extract mood estimates as a data frame}
+\usage{
+get_mood(obj, ...)
+}
 \arguments{
-\item{out}{An object of class "extract", typically a result of the `extract()` function.}
+\item{obj}{An object of class \code{"extract"} returned by
+\code{\link{extract}}.}
 
-\item{...}{Other arguments to be passed down (currently unused).}
+\item{...}{Ignored; included for potential future use.}
 }
 \value{
-A data frame containing the period of aggregation and the corresponding latent variable estimates for each dimension.
+A \code{data.frame} with one row per time period.  Columns
+  \code{period}, \code{year}, \code{month}, and \code{quarter} are
+  inherited from the period table inside \code{obj}.  When a single
+  dimension was estimated an additional column \code{mood} is appended.
+  When two dimensions were estimated, columns \code{mood_dim1} and
+  \code{mood_dim2} are appended instead.
 }
 \description{
-Retrieve the latent variable estimates from the dyad ratios algorithm produced by the `extract()` function.
+Combines the period descriptor table from an \code{\link{extract}} result
+with the estimated mood trajectory, returning a plain \code{data.frame}
+that is convenient for further analysis or export.
+}
+\examples{
+set.seed(1)
+dat <- data.frame(
+  varname = rep(c("a", "b", "c"), each = 20),
+  date    = rep(seq(as.Date("1980-01-01"), by = "year", length.out = 20), 3),
+  index   = 50 + rnorm(60, 0, 5),
+  n       = 1000L
+)
+res <- extract(dat, n_col = "n", smoothing = FALSE)
+mood_df <- get_mood(res)
+head(mood_df)
+
 }

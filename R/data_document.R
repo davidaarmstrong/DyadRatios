@@ -22,4 +22,3 @@
 #' data(jennings)
 #' head(jennings)
 "jennings"
-
