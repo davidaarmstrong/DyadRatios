@@ -1,15 +1,26 @@
 Package: DyadRatios
 Type: Package
-Title: Dyad Ratios Algorithm
-Version: 1.4
-Date: 2026-04-08
-Authors@R: c(person("Dave", "Armstrong", role=c("cre"), email="davearmstrong.ps@gmail.com"), 
-             person("James", "Stimson", role=c("aut"))) 
-Description: Estimates the Dyad Ratios Algorithm for pooling and smoothing poll estimates. The Dyad Ratios Algorithm smooths both forward and backward in time over polling results allowing differences in both question type and polling house. The result is an estimate of a single latent variable that describes the systematic trend over time in the (noisy) polling results. See James A. Stimson (2018) <doi:10.1177/0759106318761614> and the package's vignette for more details. 
-Depends: R (>= 4.1.0)
-Imports: ggplot2, lubridate, progress, stats, utils
-License: GPL (>=2)
+Title: Dyad Ratios Algorithm for Latent Variable Estimation
+Version: 2.0
+Date: 2026-05-07
+Authors@R: c(
+    person("James", "Stimson", role = c("aut"), comment = "Original C++ implementation"),
+    person("Dave", "Armstrong", role = c("cre", "aut"), email = "davearmstrong.ps@gmail.com")
+    )
+Description: Implements the Dyad Ratios algorithm for estimating latent
+    variables from time-series survey data. The algorithm estimates a
+    latent mood dimension (or two dimensions) from a set of issue opinion
+    series. Supports annual, quarterly, monthly, and daily aggregation
+    intervals, optional exponential smoothing, and up to two latent
+    dimensions. Input data can be provided as a data frame or read from
+    delimited text files. Based on the MCalc C++ program by James Stimson
+    (University of North Carolina).
+License: GPL-3
 Encoding: UTF-8
-Suggests: dplyr, rio, knitr, rmarkdown, parallel, tidyr
+Depends: R (>= 4.1.0)
+Imports: Rcpp (>= 1.0.0)
+LinkingTo: Rcpp
 VignetteBuilder: knitr
 RoxygenNote: 7.3.3
+Suggests: testthat (>= 3.0.0), ggplot2, knitr, rmarkdown, dplyr, lubridate, rio, tidyr
+NeedsCompilation: yes
