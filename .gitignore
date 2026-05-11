@@ -2,3 +2,7 @@ inst/doc
 .Rproj.user
 src/*.o
 src/*.so
+.DS_Store
+**/.DS_Store
+tests/testthat/Rplots.pdf
+vignettes/*.log
