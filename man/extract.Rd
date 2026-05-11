@@ -17,7 +17,8 @@ extract(
   n_dim = 1L,
   smoothing = TRUE,
   tol = 0.001,
-  fiscal_year_end = 12L
+  fiscal_year_end = 12L,
+  smooth_seed = 1L
 )
 }
 \arguments{
@@ -72,6 +73,14 @@ item-mood correlations between iterations).  Default \code{0.001}.}
 year; use 12 (default) for calendar years.  When set to a value < 12
 observations after this month are rolled forward into the next year,
 consistent with the original program's \code{FinalMonth} parameter.}
+
+\item{smooth_seed}{Integer.  Seed for the C random number generator used
+inside the exponential-smoothing optimiser (\code{eSmooth}).  The default
+value of \code{1} replicates MCalc's implicit behaviour: MCalc never
+calls \code{srand()}, so C's \code{rand()} starts from seed 1 on every
+run.  Change this only if you need to explore sensitivity to the smoothing
+optimiser's random fallback step.  Has no effect when
+\code{smoothing = FALSE}.}
 }
 \value{
 An object of class \code{"extract"}, which is a named list
@@ -95,8 +104,12 @@ An object of class \code{"extract"}, which is a named list
     \item{\code{alpha_F}}{Final forward-pass smoothing parameter.}
     \item{\code{alpha_B}}{Final backward-pass smoothing parameter.}
     \item{\code{eigenvalue}}{Eigenvalue estimate for the first dimension.}
-    \item{\code{variance_explained}}{Proportion of variance accounted for
-      by the extracted dimension(s).}
+    \item{\code{variance_explained}}{Proportion of total variance accounted
+      for by the first dimension.}
+    \item{\code{variance_explained_dim2}}{(\code{n_dim = 2} only) Additional
+      proportion of total variance accounted for by the second dimension (i.e.
+      its share of the variance left unexplained by dimension 1).  \code{NA}
+      for single-dimension solutions.}
     \item{\code{call}}{The matched \code{\link[base]{call}}.}
     \item{\code{settings}}{List of all parameter values used.}
   }
