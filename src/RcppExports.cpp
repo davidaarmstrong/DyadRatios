@@ -11,8 +11,8 @@ Rcpp::Rostream<false>& Rcpp::Rcerr = Rcpp::Rcpp_cerr_get();
 #endif
 
 // dyad_ratios_cpp
-List dyad_ratios_cpp(NumericMatrix data_matrix, int nperiods, int nVar, int npass, bool smoothing, double tola_in, int beginper, int endper, NumericVector raw_av, NumericVector raw_std);
-RcppExport SEXP _DyadRatios_dyad_ratios_cpp(SEXP data_matrixSEXP, SEXP nperiodsSEXP, SEXP nVarSEXP, SEXP npassSEXP, SEXP smoothingSEXP, SEXP tola_inSEXP, SEXP beginperSEXP, SEXP endperSEXP, SEXP raw_avSEXP, SEXP raw_stdSEXP) {
+List dyad_ratios_cpp(NumericMatrix data_matrix, int nperiods, int nVar, int npass, bool smoothing, double tola_in, int beginper, int endper, NumericVector raw_av, NumericVector raw_std, int seed);
+RcppExport SEXP _DyadRatios_dyad_ratios_cpp(SEXP data_matrixSEXP, SEXP nperiodsSEXP, SEXP nVarSEXP, SEXP npassSEXP, SEXP smoothingSEXP, SEXP tola_inSEXP, SEXP beginperSEXP, SEXP endperSEXP, SEXP raw_avSEXP, SEXP raw_stdSEXP, SEXP seedSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
@@ -26,13 +26,14 @@ BEGIN_RCPP
     Rcpp::traits::input_parameter< int >::type endper(endperSEXP);
     Rcpp::traits::input_parameter< NumericVector >::type raw_av(raw_avSEXP);
     Rcpp::traits::input_parameter< NumericVector >::type raw_std(raw_stdSEXP);
-    rcpp_result_gen = Rcpp::wrap(dyad_ratios_cpp(data_matrix, nperiods, nVar, npass, smoothing, tola_in, beginper, endper, raw_av, raw_std));
+    Rcpp::traits::input_parameter< int >::type seed(seedSEXP);
+    rcpp_result_gen = Rcpp::wrap(dyad_ratios_cpp(data_matrix, nperiods, nVar, npass, smoothing, tola_in, beginper, endper, raw_av, raw_std, seed));
     return rcpp_result_gen;
 END_RCPP
 }
 
 static const R_CallMethodDef CallEntries[] = {
-    {"_DyadRatios_dyad_ratios_cpp", (DL_FUNC) &_DyadRatios_dyad_ratios_cpp, 10},
+    {"_DyadRatios_dyad_ratios_cpp", (DL_FUNC) &_DyadRatios_dyad_ratios_cpp, 11},
     {NULL, NULL, 0}
 };
 

@@ -46,6 +46,13 @@
 #'   year; use 12 (default) for calendar years.  When set to a value < 12
 #'   observations after this month are rolled forward into the next year,
 #'   consistent with the original program's \code{FinalMonth} parameter.
+#' @param smooth_seed Integer.  Seed for the C random number generator used
+#'   inside the exponential-smoothing optimiser (\code{eSmooth}).  The default
+#'   value of \code{1} replicates MCalc's implicit behaviour: MCalc never
+#'   calls \code{srand()}, so C's \code{rand()} starts from seed 1 on every
+#'   run.  Change this only if you need to explore sensitivity to the smoothing
+#'   optimiser's random fallback step.  Has no effect when
+#'   \code{smoothing = FALSE}.
 #'
 #' @return An object of class \code{"extract"}, which is a named list
 #'   containing:
@@ -68,8 +75,12 @@
 #'     \item{\code{alpha_F}}{Final forward-pass smoothing parameter.}
 #'     \item{\code{alpha_B}}{Final backward-pass smoothing parameter.}
 #'     \item{\code{eigenvalue}}{Eigenvalue estimate for the first dimension.}
-#'     \item{\code{variance_explained}}{Proportion of variance accounted for
-#'       by the extracted dimension(s).}
+#'     \item{\code{variance_explained}}{Proportion of total variance accounted
+#'       for by the first dimension.}
+#'     \item{\code{variance_explained_dim2}}{(\code{n_dim = 2} only) Additional
+#'       proportion of total variance accounted for by the second dimension (i.e.
+#'       its share of the variance left unexplained by dimension 1).  \code{NA}
+#'       for single-dimension solutions.}
 #'     \item{\code{call}}{The matched \code{\link[base]{call}}.}
 #'     \item{\code{settings}}{List of all parameter values used.}
 #'   }
@@ -123,7 +134,8 @@ extract <- function(data,
                         n_dim          = 1L,
                         smoothing      = TRUE,
                         tol            = 0.001,
-                        fiscal_year_end = 12L) {
+                        fiscal_year_end = 12L,
+                        smooth_seed    = 1L) {
 
   cl <- match.call()
   agg_interval <- match.arg(agg_interval)
@@ -217,12 +229,23 @@ extract <- function(data,
   nVar       <- ncol(pIssue_raw)
 
   # ---- standardise: 100 + 10 * z  (matching original code) ---------------
+  # MCalc stores per-variable means as float (32-bit) via av[v]=float(s/nGood),
+  # even though av[] is declared double.  Simulate that precision loss so that
+  # the standardised values fed to the C++ core match MCalc exactly.
+  to_float32 <- function(x)
+    readBin(writeBin(as.double(x), raw(), size = 4L),
+            double(), n = length(x), size = 4L)
+
   av_vec  <- numeric(nVar)
   std_vec <- numeric(nVar)
   for (v in seq_len(nVar)) {
     good <- pIssue_raw[, v]; good <- good[good != 0]
     av_vec[v]  <- mean(good)
     std_vec[v] <- sd(good)
+  }
+  av_vec <- to_float32(av_vec)   # match MCalc's float() cast on the mean
+
+  for (v in seq_len(nVar)) {
     non_na <- pIssue_raw[, v] != 0
     pIssue_raw[non_na, v] <-
       100 + 10 * (pIssue_raw[non_na, v] - av_vec[v]) / std_vec[v]
@@ -239,7 +262,8 @@ extract <- function(data,
     beginper    = 1L,
     endper      = nperiods,
     raw_av      = av_vec,
-    raw_std     = std_vec
+    raw_std     = std_vec,
+    seed        = as.integer(smooth_seed)
   )
 
   # ---- assemble loadings data frame --------------------------------------
@@ -268,7 +292,8 @@ extract <- function(data,
     alpha_F            = cpp_out$alpha_F,
     alpha_B            = cpp_out$alpha_B,
     eigenvalue         = cpp_out$eigenvalue,
-    variance_explained = cpp_out$variance_explained,
+    variance_explained      = cpp_out$variance_explained,
+    variance_explained_dim2 = cpp_out$variance_explained_dim2,
     call               = cl,
     settings           = list(
       agg_interval    = agg_interval,
@@ -278,7 +303,8 @@ extract <- function(data,
       tol             = tol,
       start_date      = min_date,
       end_date        = max_date,
-      fiscal_year_end = fiscal_year_end
+      fiscal_year_end = fiscal_year_end,
+      smooth_seed     = as.integer(smooth_seed)
     )
   )
   class(result) <- "extract"

@@ -403,8 +403,17 @@ summary.extract <- function(object, ...) {
   cat("Variance Accounting\n")
   cat("----------------------------------------------------------------\n")
   cat(sprintf("Eigenvalue estimate:    %.3f\n", x$eigenvalue))
-  cat(sprintf("Variance explained:     %.1f%%\n\n",
-              100 * x$variance_explained))
+  cat(sprintf("Variance explained:     %.1f%%", 100 * x$variance_explained))
+  if (s$n_dim == 2 && !is.na(x$variance_explained_dim2)) {
+    cat(sprintf("  (dim 1)\n"))
+    cat(sprintf("Variance explained:     %.1f%%  (dim 2)\n",
+                100 * x$variance_explained_dim2))
+    cat(sprintf("Variance explained:     %.1f%%  (combined)\n",
+                100 * (x$variance_explained + x$variance_explained_dim2)))
+  } else {
+    cat("\n")
+  }
+  cat("\n")
 
   invisible(x)
 }

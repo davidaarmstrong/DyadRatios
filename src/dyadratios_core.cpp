@@ -7,12 +7,24 @@
 // [[Rcpp::depends(Rcpp)]]
 #include <Rcpp.h>
 #include <cmath>
+#include <cstdlib>   // srand, rand, RAND_MAX
 #include <vector>
 #include <string>
 #include <algorithm>
 #include <numeric>
 
 using namespace Rcpp;
+
+// ---------------------------------------------------------------------------
+// unifRand: faithful copy of MCalc's unifRand().
+// Wastes one rand() call (matching MCalc exactly), then returns a U[0,1].
+// Call srand(seed) before the estimation loop to control the sequence;
+// srand(1) reproduces MCalc's implicit default (no srand = seed of 1).
+// ---------------------------------------------------------------------------
+static double unifRand() {
+    rand();                                  // waste one, as in MCalc
+    return rand() / static_cast<double>(RAND_MAX);
+}
 
 // ---------------------------------------------------------------------------
 // Constants matching the original program
@@ -197,7 +209,7 @@ static double eSmooth(CMat1& mood, int fb, double /*alpha*/, int nperiods) {
         }
 
         if (VectAlpha[4] < Lb || VectAlpha[4] > Ub) {
-            VectAlpha[4] = Lb + R::runif(0.0, 1.0) * (Ub - Lb);
+            VectAlpha[4] = Lb + unifRand() * (Ub - Lb);
             SetD = 1;
         }
         for (int L = 1; L <= 3; ++L)
@@ -396,7 +408,12 @@ List dyad_ratios_cpp(NumericMatrix data_matrix,
                      double tola_in,
                      int beginper, int endper,
                      NumericVector raw_av,
-                     NumericVector raw_std) {
+                     NumericVector raw_std,
+                     int seed = 1) {
+
+    // Seed the C RNG.  Default seed=1 replicates MCalc's implicit behaviour
+    // (MCalc never calls srand(), so C uses seed 1 automatically).
+    srand(static_cast<unsigned int>(seed));
 
     // --- build pIssue (1-indexed CMat1) from R matrix (0-indexed) ----------
     CMat1 pIssue(nperiods + 1, nVar + 1);
@@ -440,10 +457,13 @@ List dyad_ratios_cpp(NumericMatrix data_matrix,
     std::vector<std::vector<double>> R_load(3, std::vector<double>(nVar + 1, 0.0));
 
     double evalue = 0.0, totalvar = 0.0, expprop = 0.0, tot1 = 0.0;
+    double expprop_dim2 = 0.0;          // cumulative variance explained (both dims)
     double vsum = 0.0;
     double alpha = 1.0, alphaF = 1.0;
     double holdtola = tola_in;
     double lastconv = 99.0;
+    // Pass-1 wtmean/wtstd saved so pass-2 mood is expressed on the same scale.
+    double wtmean1 = 0.0, wtstd1 = 0.0;
 
     // -----------------------------------------------------------------------
     for (int pass = 1; pass <= npass; ++pass) {
@@ -506,6 +526,10 @@ List dyad_ratios_cpp(NumericMatrix data_matrix,
             }
             if (vsum > 0.0) { wtmean /= vsum; wtstd /= vsum; }
 
+            // MCalc: for pass 2 restore pass-1 wtmean/wtstd so both dimensions
+            // are expressed on the same scale when mood is rescaled below.
+            if (pass == 2) { wtmean = wtmean1; wtstd = wtstd1; }
+
             double fb_corr = fbCor(mood, beginper, endper);
             if (converge > lastconv) tola *= 2.0;
             lastconv = converge;
@@ -521,9 +545,23 @@ List dyad_ratios_cpp(NumericMatrix data_matrix,
             if (pass == 1) r1[v] = corr[v];
         }
 
-        if (pass == 1) { expprop = evalue / totalvar; tot1 = totalvar; }
+        if (pass == 1) {
+            expprop  = evalue / totalvar;   // dim-1 variance explained
+            tot1     = totalvar;
+            wtmean1  = wtmean;              // save for pass-2 rescaling
+            wtstd1   = wtstd;
+        } else {
+            // MCalc pass-2 formula: express dim-2 contribution as a fraction of
+            // the original total variance and accumulate with dim-1.
+            double erel      = evalue / totalvar;
+            double tv_unexp  = (1.0 - expprop) * tot1;
+            double eval2     = erel * tv_unexp;
+            expprop_dim2     = eval2 / tot1;   // dim-2 share of original variance
+        }
 
-        // rescale mood to match weighted mean/std of the issues
+        // rescale mood to match weighted mean/std of the issues.
+        // For pass 2, wtmean/wtstd have already been restored to pass-1 values
+        // (see inside the convergence loop above), so both dims share one scale.
         double msum = 0.0, msq = 0.0;
         for (int p = 1; p <= nperiods; ++p) {
             double mp = mood(AVERAGE, p);
@@ -587,14 +625,16 @@ List dyad_ratios_cpp(NumericMatrix data_matrix,
     );
 
     return List::create(
-        Named("mood")               = mood_out,
-        Named("mood_dim1")          = mood_d1,
-        Named("mood_dim2")          = mood_d2,
-        Named("loadings")           = loadings,
-        Named("iterations")         = idf,
-        Named("alpha_F")            = alphaF,
-        Named("alpha_B")            = alpha,
-        Named("eigenvalue")         = evalue,
-        Named("variance_explained") = (tot1 > 0) ? expprop : NA_REAL
+        Named("mood")                    = mood_out,
+        Named("mood_dim1")               = mood_d1,
+        Named("mood_dim2")               = mood_d2,
+        Named("loadings")                = loadings,
+        Named("iterations")              = idf,
+        Named("alpha_F")                 = alphaF,
+        Named("alpha_B")                 = alpha,
+        Named("eigenvalue")              = evalue,
+        Named("variance_explained")      = (tot1 > 0) ? expprop      : NA_REAL,
+        Named("variance_explained_dim2") = (npass == 2 && tot1 > 0)
+                                              ? expprop_dim2 : NA_REAL
     );
 }
