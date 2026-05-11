@@ -7,7 +7,6 @@
 // [[Rcpp::depends(Rcpp)]]
 #include <Rcpp.h>
 #include <cmath>
-#include <cstdlib>   // srand, rand, RAND_MAX
 #include <vector>
 #include <string>
 #include <algorithm>
@@ -16,14 +15,38 @@
 using namespace Rcpp;
 
 // ---------------------------------------------------------------------------
-// unifRand: faithful copy of MCalc's unifRand().
-// Wastes one rand() call (matching MCalc exactly), then returns a U[0,1].
-// Call srand(seed) before the estimation loop to control the sequence;
-// srand(1) reproduces MCalc's implicit default (no srand = seed of 1).
+// Self-contained Park-Miller LCG — matches macOS/BSD rand() exactly.
+//
+// macOS rand() uses the minimal-standard Park-Miller generator:
+//   x_{n+1} = 16807 * x_n  mod (2^31 - 1)
+// with RAND_MAX = 2147483647 (= 2^31 - 1).
+//
+// Implementing it here (rather than calling the system rand/srand) keeps the
+// package CRAN-compliant: no system RNG entry points are called, the sequence
+// is fully portable across platforms, and with seed=1 it reproduces MCalc's
+// implicit behaviour exactly (MCalc never calls srand(), so C starts at 1).
 // ---------------------------------------------------------------------------
+static unsigned long lcg_state = 1;
+
+static void lcg_srand(unsigned int seed) {
+    // C standard: srand(0) is treated as srand(1); Park-Miller must not be 0
+    lcg_state = (seed == 0) ? 1UL : static_cast<unsigned long>(seed);
+}
+
+static int lcg_rand() {
+    // Park-Miller: x = 16807*x mod 2147483647, computed overflow-safe via
+    // Schrage's method (hi/lo decomposition avoids 64-bit intermediate).
+    long hi = static_cast<long>(lcg_state) / 127773L;
+    long lo = static_cast<long>(lcg_state) % 127773L;
+    long x  = 16807L * lo - 2836L * hi;
+    if (x < 0) x += 0x7fffffffL;
+    lcg_state = static_cast<unsigned long>(x);
+    return static_cast<int>(x);
+}
+
 static double unifRand() {
-    rand();                                  // waste one, as in MCalc
-    return rand() / static_cast<double>(RAND_MAX);
+    lcg_rand();                                          // waste one, as in MCalc
+    return lcg_rand() / static_cast<double>(0x7fffffff); // RAND_MAX on macOS
 }
 
 // ---------------------------------------------------------------------------
@@ -411,9 +434,9 @@ List dyad_ratios_cpp(NumericMatrix data_matrix,
                      NumericVector raw_std,
                      int seed = 1) {
 
-    // Seed the C RNG.  Default seed=1 replicates MCalc's implicit behaviour
-    // (MCalc never calls srand(), so C uses seed 1 automatically).
-    srand(static_cast<unsigned int>(seed));
+    // Seed the LCG.  Default seed=1 replicates MCalc's implicit behaviour
+    // (MCalc never calls srand(), so C starts at seed 1 automatically).
+    lcg_srand(static_cast<unsigned int>(seed));
 
     // --- build pIssue (1-indexed CMat1) from R matrix (0-indexed) ----------
     CMat1 pIssue(nperiods + 1, nVar + 1);
