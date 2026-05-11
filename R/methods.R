@@ -1,10 +1,16 @@
 #' Bootstrap the Dyad Ratios estimate
+#' 
+#' The bootstrapping algorithm was added to the package and code by Dave Armstrong. 
+#' It is worth noting that this was not something Stimson had originally implemented
+#' nor even something that he necessarily even endorsed.  While bootstrapping is a common
+#' method for estimating uncertainty in complex estimators, like this one, use these
+#' results at your own risk.  
 #'
 #' Generates a sampling distribution around the latent mood trajectory by
 #' repeatedly drawing synthetic survey marginals from a binomial model and
 #' re-running \code{\link{extract}}.  The original (unperturbed) estimate is
 #' used as the point estimate; the bootstrap draws characterise uncertainty
-#' around it.
+#' around it.  
 #'
 #' All model parameters (aggregation interval, column names, smoothing, etc.)
 #' are taken directly from the stored call inside \code{obj}, so there is no
