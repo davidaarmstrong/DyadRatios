@@ -5,7 +5,11 @@
 \title{Run MCalc non-interactively}
 \usage{
 run_mcalc(
-  file,
+  data,
+  varname_col = "varname",
+  date_col = "date",
+  index_col = "index",
+  n_col = NULL,
   agg_interval = "a",
   n_dim = 1L,
   smoothing = TRUE,
@@ -19,7 +23,29 @@ run_mcalc(
 )
 }
 \arguments{
-\item{file}{Character. Full path to the MCalc input data file.}
+\item{data}{Either a character string giving the full path to a
+MCalc-format data file, \emph{or} a data frame containing the survey
+series.  When a data frame is supplied the columns specified by
+\code{varname_col}, \code{date_col}, \code{index_col}, and \code{n_col}
+are used to build the input file automatically.}
+
+\item{varname_col}{Character. Name of the column in \code{data} that holds
+the variable/series identifier.  Default \code{"varname"}.  Ignored when
+\code{data} is a file path.}
+
+\item{date_col}{Character. Name of the column in \code{data} that holds the
+observation date (a \code{Date} object or a character string in any
+unambiguous format recognised by \code{\link[base]{as.Date}}).
+Default \code{"date"}.  Ignored when \code{data} is a file path.}
+
+\item{index_col}{Character. Name of the column that holds the numeric index
+value (e.g. percentage agreeing).  Default \code{"index"}.  Ignored when
+\code{data} is a file path.}
+
+\item{n_col}{Character or \code{NULL}. Name of the column that holds the
+sample size for each observation.  When \code{NULL} (default) a
+placeholder of \code{1000} is used for every row, which leaves relative
+weighting uniform.  Ignored when \code{data} is a file path.}
 
 \item{agg_interval}{Character. Aggregation interval: \code{"a"} (annual,
 default), \code{"q"} (quarterly), \code{"m"} (monthly), \code{"d"}
@@ -36,24 +62,25 @@ on or after this year.  \code{NULL} (default) accepts MCalc's earliest
 available date.}
 
 \item{start_period}{Integer or \code{NULL}. For quarterly/monthly/daily
-aggregation, the sub-annual start period (quarter 1-4, month 1-12, or
-day 1-31).  Ignored for annual aggregation.  \code{NULL} uses period 1.}
+aggregation, the sub-annual start period (quarter 1–4, month 01–12, or
+day 01–31).  Ignored for annual aggregation.  \code{NULL} uses period 1.}
 
 \item{end_year}{Integer or \code{NULL}. Restrict estimation to periods on
 or before this year.  \code{NULL} (default) accepts MCalc's latest
 available date.}
 
-\item{end_period}{Integer or \code{NULL}. Sub-annual end period.  \code{NULL}
-uses the last period of the year (4, 12, or 31 depending on interval).}
+\item{end_period}{Integer or \code{NULL}. Sub-annual end period.
+\code{NULL} uses the last period of the year (4, 12, or 31).}
 
-\item{output_root}{Character or \code{NULL}.  Root name for the output
-\code{.log} and \code{.csv} files.  \code{NULL} (default) accepts MCalc's
-default, which is the stem of the input file name.}
+\item{output_root}{Character or \code{NULL}. Root name for the output
+\code{.log} and \code{.csv} files.  When \code{NULL} and \code{data} is a
+file path, MCalc uses the input file's stem.  When \code{NULL} and
+\code{data} is a data frame, defaults to \code{"mcalc_output"}.}
 
 \item{mcalc_path}{Character. Full path to the MCalc executable.  Defaults
 to \code{"/usr/local/bin/MCalc64"}.}
 
-\item{read_output}{Logical.  If \code{TRUE} (default), reads and returns the
+\item{read_output}{Logical. If \code{TRUE} (default), reads and returns the
 \code{.csv} output as a data frame.  If \code{FALSE}, returns only the
 file paths and console output.}
 }
@@ -70,21 +97,34 @@ A list with elements:
 \description{
 Constructs the sequence of keystrokes that MCalc expects, writes them to a
 temporary file, and pipes that file into the MCalc executable via
-\code{system()}.  Output \code{.log} and \code{.csv} files are written to
-the same directory as the input file (MCalc's fixed behaviour).
+\code{system()}.  The first argument can be either a path to an existing
+MCalc-format data file \emph{or} an R data frame; in the latter case the
+data are written to a temporary file in the correct format before being
+passed to MCalc.
 }
 \examples{
 \dontrun{
-# 1-dimension run, annual, smoothing on
-out <- run_mcalc("/Users/me/data/mysurvey.txt")
+# --- from a file path ---------------------------------------------------
+out <- run_mcalc("/Users/me/data/mysurvey.txt",
+                 mcalc_path = "/Users/me/bin/MCalc64")
 head(out$data)
 
-# 2-dimension run, restrict dates, smoothing off
-out2 <- run_mcalc("/Users/me/data/mysurvey.txt",
+# --- from a data frame --------------------------------------------------
+# with default column names (varname, date, index, n)
+out2 <- run_mcalc(my_df,
                   n_dim      = 2,
                   smoothing  = FALSE,
-                  start_year = 1980,
-                  end_year   = 2020)
+                  mcalc_path = "/Users/me/bin/MCalc64")
+
+# with custom column names
+out3 <- run_mcalc(survey_df,
+                  varname_col = "item",
+                  date_col    = "fielddate",
+                  index_col   = "pct_agree",
+                  n_col       = "sample_size",
+                  start_year  = 1990,
+                  end_year    = 2020,
+                  mcalc_path  = "/Users/me/bin/MCalc64")
 }
 
 }
